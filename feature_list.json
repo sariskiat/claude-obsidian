@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "current_feature": "graph-native-gaps",
+  "current_feature": "graph-resolve-dedup",
   "wip_limit": 1,
   "features": {
     "graph-vault-migration": {
@@ -291,7 +291,7 @@
       "id": "graph-native-gaps",
       "title": "Native Gap Scanner \u2014 replace oracle gaps.py with repo-native analytics",
       "phase": "passing",
-      "status": "in_progress",
+      "status": "completed",
       "problem_classification": "unique",
       "problem_statement": "The 5-species gap scanner lives in the oracle dotdir (~/.claude/skills/graphbuilding/scripts/gaps.py), uses broken COALESCE(canonical_id,id) for entity resolution, and is not in this repo \u2014 it cannot evolve with the vault.",
       "jtbd": "When I scan my claim graph for research gaps, I want a native gap scanner in this repo that uses root() (not broken COALESCE), runs on the derived db, and produces identical results to the oracle, so the analytics engine lives with the vault and evolves with it.",
@@ -434,6 +434,152 @@
               ".vault-meta/graph/graph.db"
             ],
             "metric": "AC1 AC2 AC8"
+          }
+        }
+      ]
+    },
+    "graph-resolve-dedup": {
+      "id": "graph-resolve-dedup",
+      "title": "Entity Resolution + Embedding Dedup",
+      "phase": "plan",
+      "status": "in_progress",
+      "problem_classification": "unique",
+      "problem_statement": "689 variant entities exist in the graph. Same concepts under different names fragment gap counts and weaken the knowledge graph.",
+      "jtbd": "When I want to clean up duplicate entities, I need a tool that finds likely duplicates using exact matching and semantic similarity, ranks them by confidence, and presents them for human review.",
+      "user_context": "Single-tenant fork owner. Phase 3 of graphbuilding-fusion epic.",
+      "spec_file": "specs/graph-resolve-dedup.md",
+      "spec_status": "approved",
+      "approval": {
+        "approved_by": "saris",
+        "approved_on": "2026-06-06",
+        "domain_lead": true,
+        "tech_lead": true
+      },
+      "depends_on": [
+        "graph-native-gaps"
+      ],
+      "blocks": [],
+      "scope_map": {
+        "modify": [
+          "scripts/graph-resolve.py",
+          "tests/test_graph_resolve.py"
+        ],
+        "read_only": [
+          "scripts/graph_db.py",
+          "scripts/graph-gaps.py",
+          "scripts/graph-build.py",
+          "wiki/graph/",
+          "pyproject.toml"
+        ],
+        "metric": "number of real duplicate entity pairs found (qualitative \u2014 human validates)"
+      },
+      "metric": {
+        "name": "duplicate_detection",
+        "baseline": "0 proposals (no tool exists)",
+        "target": "detect exact-name duplicates AND fuzzy semantic duplicates, ranked by confidence",
+        "direction": "qualitative",
+        "how_measured": "uv run python scripts/graph-resolve.py --json | python3 -c \"import json,sys; d=json.load(sys.stdin); print(f'{len(d)} proposals')\"",
+        "keep_revert_rule": "keep if P1+P2 suites stay green; revert otherwise"
+      },
+      "acceptance_criteria": [
+        {
+          "id": "AC1",
+          "text": "Tier 1 finds exact-name duplicates",
+          "verification": "uv run python -m pytest tests/test_graph_resolve.py -q -k tier1",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC2",
+          "text": "Tier 2A embedding when ollama available",
+          "verification": "uv run python -m pytest tests/test_graph_resolve.py -q -k embedding",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC3",
+          "text": "Tier 2B token Jaccard fallback",
+          "verification": "uv run python -m pytest tests/test_graph_resolve.py -q -k jaccard",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC4",
+          "text": "JSON schema valid",
+          "verification": "uv run python scripts/graph-resolve.py --json | python3 -c \"import json,sys; d=json.load(sys.stdin); assert isinstance(d,list)\"",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC5",
+          "text": "No COALESCE \u2014 uses root()",
+          "verification": "bash -c \"grep COALESCE scripts/graph-resolve.py; test $? -eq 1\"",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC6",
+          "text": "Zero oracle imports",
+          "verification": "bash -c \"grep -r skills/graphbuilding scripts/graph-resolve.py; test $? -eq 1\"",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC7",
+          "text": "P1+P2 suites green",
+          "verification": "uv run python -m pytest tests/test_graph_roundtrip.py tests/test_graph_gaps.py -q",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC8",
+          "text": "Full P3 suite green",
+          "verification": "uv run python -m pytest tests/test_graph_resolve.py -q",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC9",
+          "text": "Missing db exits 1",
+          "verification": "uv run python scripts/graph-resolve.py --db /nonexistent 2>&1; test $? -eq 1",
+          "expected_exit": 0
+        }
+      ],
+      "tasks": [
+        {
+          "id": "T1",
+          "title": "scripts/graph-resolve.py: two-tier entity resolution",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "scripts/graph-resolve.py"
+          ],
+          "depends_on": [],
+          "verification": "uv run python scripts/graph-resolve.py --json",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "scripts/graph-resolve.py"
+            ],
+            "read_only": [
+              "scripts/graph_db.py"
+            ],
+            "metric": "AC1-AC6"
+          }
+        },
+        {
+          "id": "T2",
+          "title": "tests/test_graph_resolve.py: tier1, jaccard, schema, edge cases",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "tests/test_graph_resolve.py"
+          ],
+          "depends_on": [
+            "T1"
+          ],
+          "verification": "uv run python -m pytest tests/test_graph_resolve.py -q",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "tests/test_graph_resolve.py"
+            ],
+            "read_only": [
+              "scripts/graph-resolve.py"
+            ],
+            "metric": "AC1-AC4 AC8-AC9"
           }
         }
       ]

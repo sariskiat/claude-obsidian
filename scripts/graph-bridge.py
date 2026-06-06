@@ -424,8 +424,17 @@ def _check_already_proposed(comm_i_nodes, comm_j_nodes, conn) -> bool:
 # ---------------------------------------------------------------------------
 
 def _community_info(comm_nodes, G, comm_idx: int) -> dict:
-    """Build the community_a/community_b dict for a proposal."""
-    names = sorted([G.nodes[n].get("name", f"e{n}") for n in comm_nodes])
+    """Build the community_a/community_b dict for a proposal.
+
+    Members are sorted by graph degree descending so high-connectivity (anchor)
+    entities appear first — this ensures direction_relevance keywords (e.g.
+    'Virtual Try-On', 'Neon') surface in the truncated member list for tests
+    and reports even in large communities.  Ties broken alphabetically.
+    """
+    scored = sorted(
+        [(-G.degree(n, weight="weight"), G.nodes[n].get("name", f"e{n}")) for n in comm_nodes]
+    )
+    names = [name for _, name in scored]
     super_types = list({G.nodes[n].get("super_type", "unknown") for n in comm_nodes})
     return {
         "id": comm_idx,

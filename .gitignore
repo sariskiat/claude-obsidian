@@ -139,3 +139,8 @@ _attachments/
 
 # graph vault migration — derived sqlite index (throwaway); JSON snapshot IS tracked
 .vault-meta/graph/graph.db
+
+# P4 full-paper retrieval — graph-scoped chunk store + BM25 index (derived/throwaway)
+# wiki/graph/papers/*.full.md ARE tracked (git SoT); the index dirs are not
+.vault-meta/graph/chunks/
+.vault-meta/graph/bm25/

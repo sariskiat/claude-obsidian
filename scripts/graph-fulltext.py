@@ -63,6 +63,9 @@ VAULT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = VAULT_ROOT / "scripts"
 META_DIR = VAULT_ROOT / ".vault-meta"
 
+# Default paper-scholar root; override with PAPER_SCHOLAR_DIR env var (used by tests).
+_DEFAULT_PAPER_SCHOLAR = Path.home() / ".paper-scholar"
+
 DEFAULT_EXPORT = VAULT_ROOT / "wiki" / "graph" / "graph-export.json"
 DEFAULT_PAPERS_DIR = VAULT_ROOT / "wiki" / "graph" / "papers"
 DEFAULT_CHUNKS_DIR = META_DIR / "graph" / "chunks"
@@ -99,13 +102,58 @@ def sha256(data: bytes) -> str:
 # Resolver: classify each paper in graph-export.json
 # ---------------------------------------------------------------------------
 
-def _resolve_source_path(source_path: str):
+def _paper_scholar_root() -> Path:
+    """Return the paper-scholar root directory.
+
+    Reads PAPER_SCHOLAR_DIR env var when set (used by tests); otherwise uses
+    the default ~/.paper-scholar location.
+    """
+    env_override = os.environ.get("PAPER_SCHOLAR_DIR")
+    if env_override:
+        return Path(env_override)
+    return _DEFAULT_PAPER_SCHOLAR
+
+
+def _slug_dir_fallback(slug: str):
+    """Look in <paper-scholar-root>/<slug>/ for exactly one *.md (non-meta).
+
+    Returns (Path, 'tier_a_slug_dir') if exactly one candidate is found.
+    Returns (None, reason) if the dir is absent, has 0 candidates, or >1 candidates.
+    This is the last-resort fallback — callers must try all source_path strategies first.
+    """
+    ps_root = _paper_scholar_root()
+    slug_dir = ps_root / slug
+    if not slug_dir.is_dir():
+        return None, f"slug_dir_absent:{slug_dir}"
+    # Exclude _meta.json files; include only .md files
+    candidates = [
+        f for f in slug_dir.iterdir()
+        if f.suffix == ".md" and not f.name.endswith("_meta.json")
+    ]
+    if len(candidates) == 1:
+        return candidates[0], "tier_a_slug_dir"
+    if len(candidates) == 0:
+        return None, f"slug_dir_no_md:{slug_dir}"
+    return None, f"slug_dir_multi_md:{slug_dir}"
+
+
+def _resolve_source_path(source_path: str, slug: str = ""):
     """Return (resolved_absolute_path, tier_label) or (None, reason_str).
 
     Returns a Path if Tier-A (real .md file exists), or None with a reason
     string for anything that should be skipped.
+
+    Resolution order (last fallback added as slug-dir):
+      1. direct .md path that exists
+      2. paper.json -> bare dir with single inner .md
+      3. bare dir (no extension) with single inner .md
+      4. [slug-dir fallback] ~/.paper-scholar/<slug>/ with single inner .md
+         (only when source_path does not resolve via strategies 1-3)
     """
     if not source_path:
+        # No source_path — skip strategies 1-3 but still try slug-dir fallback
+        if slug:
+            return _slug_dir_fallback(slug)
         return None, "no_source_path"
     if source_path.startswith("http"):
         return None, "url"
@@ -114,9 +162,19 @@ def _resolve_source_path(source_path: str):
     if sp.suffix == ".md":
         if sp.is_file():
             return sp, "tier_a_direct"
+        # stale .md — try slug-dir fallback before giving up
+        if slug:
+            resolved, reason = _slug_dir_fallback(slug)
+            if resolved is not None:
+                return resolved, reason
         return None, f"stale_md:{sp}"
     # ends in .pdf
     if sp.suffix == ".pdf":
+        # PDF source — try slug-dir fallback
+        if slug:
+            resolved, reason = _slug_dir_fallback(slug)
+            if resolved is not None:
+                return resolved, reason
         return None, "pdf"
     # paper.json -> bare dir with single inner .md
     if sp.name == "paper.json":
@@ -125,6 +183,11 @@ def _resolve_source_path(source_path: str):
             mds = [f for f in d.iterdir() if f.suffix == ".md"]
             if len(mds) == 1:
                 return mds[0], "tier_a_paper_json_dir"
+        # paper.json dir not found or ambiguous — try slug-dir fallback
+        if slug:
+            resolved, reason = _slug_dir_fallback(slug)
+            if resolved is not None:
+                return resolved, reason
         return None, f"paper_json_no_inner_md:{sp}"
     # bare dir (no extension, exists as a directory)
     if not sp.suffix and sp.is_dir():
@@ -132,7 +195,17 @@ def _resolve_source_path(source_path: str):
         if len(mds) == 1:
             return mds[0], "tier_a_bare_dir"
         return None, f"bare_dir_multi_or_no_md:{sp}"
-    # anything else
+    # bare path that doesn't exist as a dir — try slug-dir fallback
+    if not sp.suffix and not sp.is_dir():
+        if slug:
+            resolved, reason = _slug_dir_fallback(slug)
+            if resolved is not None:
+                return resolved, reason
+    # anything else — try slug-dir fallback as last resort
+    if slug:
+        resolved, reason = _slug_dir_fallback(slug)
+        if resolved is not None:
+            return resolved, reason
     return None, f"unknown_type:{sp}"
 
 
@@ -148,7 +221,7 @@ def resolve_papers(papers_list):
     for p in papers_list:
         slug = p.get("slug", "")
         sp = p.get("source_path") or ""
-        resolved, reason = _resolve_source_path(sp)
+        resolved, reason = _resolve_source_path(sp, slug=slug)
         if resolved is not None:
             tier_a.append({
                 "slug": slug,

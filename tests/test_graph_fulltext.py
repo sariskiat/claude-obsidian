@@ -78,42 +78,73 @@ def _load_graph_export():
     return json.loads(GRAPH_EXPORT.read_text(encoding="utf-8"))
 
 
+_PS_ROOT = Path.home() / ".paper-scholar"
+
+
+def _slug_dir_candidate(slug: str) -> "Path | None":
+    """Mirror of the slug-dir fallback in graph-fulltext.py.
+
+    Returns the single .md Path if <PS_ROOT>/<slug>/ contains exactly one
+    non-meta .md, else None.
+    """
+    slug_dir = _PS_ROOT / slug
+    if not slug_dir.is_dir():
+        return None
+    candidates = [
+        f for f in slug_dir.iterdir()
+        if f.suffix == ".md" and not f.name.endswith("_meta.json")
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
 def _resolve_tier_a(graph_export_data):
     """Compute the Tier-A set (papers with a real, existing .md source).
 
-    Mirrors the resolver logic in graph-fulltext.py sync:
+    Mirrors the resolver logic in graph-fulltext.py sync (including slug-dir
+    fallback added in the dedup/re-sync task):
       - Absolute .md path that exists -> Tier-A
       - Path ends paper.json -> bare dir -> single inner .md -> Tier-A
       - Bare dir (no extension) that is a dir -> single inner .md -> Tier-A
-      - Everything else (PDF, URL, stale, multi-md) -> Tier-B/skip
+      - [slug-dir fallback] ~/.paper-scholar/<slug>/ with single non-meta .md -> Tier-A
+      - Everything else (URL, multi-md, truly absent slug) -> Tier-B/skip
     """
     papers = graph_export_data.get("papers", [])
     tier_a = []
     for p in papers:
+        slug = p["slug"]
         sp = p.get("source_path") or ""
-        if not sp or sp.startswith("http"):
+        if sp.startswith("http"):
             continue
-        sp_exp = Path(os.path.expanduser(sp))
-        # direct .md
-        if sp_exp.suffix == ".md" and sp_exp.is_file():
-            tier_a.append({"slug": p["slug"], "resolved_path": sp_exp,
-                            "arxiv_id": p.get("arxiv_id")})
-            continue
-        # paper.json -> bare dir
-        if sp_exp.name == "paper.json":
-            d = sp_exp.parent
-            if d.is_dir():
-                mds = [f for f in d.iterdir() if f.suffix == ".md"]
+        if sp:
+            sp_exp = Path(os.path.expanduser(sp))
+            # direct .md
+            if sp_exp.suffix == ".md" and sp_exp.is_file():
+                tier_a.append({"slug": slug, "resolved_path": sp_exp,
+                                "arxiv_id": p.get("arxiv_id")})
+                continue
+            # paper.json -> bare dir
+            if sp_exp.name == "paper.json":
+                d = sp_exp.parent
+                if d.is_dir():
+                    mds = [f for f in d.iterdir() if f.suffix == ".md"]
+                    if len(mds) == 1:
+                        tier_a.append({"slug": slug, "resolved_path": mds[0],
+                                       "arxiv_id": p.get("arxiv_id")})
+                        continue
+            # bare dir (no extension)
+            if not sp_exp.suffix and sp_exp.is_dir():
+                mds = [f for f in sp_exp.iterdir() if f.suffix == ".md"]
                 if len(mds) == 1:
-                    tier_a.append({"slug": p["slug"], "resolved_path": mds[0],
+                    tier_a.append({"slug": slug, "resolved_path": mds[0],
                                    "arxiv_id": p.get("arxiv_id")})
                     continue
-        # bare dir (no extension)
-        if not sp_exp.suffix and sp_exp.is_dir():
-            mds = [f for f in sp_exp.iterdir() if f.suffix == ".md"]
-            if len(mds) == 1:
-                tier_a.append({"slug": p["slug"], "resolved_path": mds[0],
-                                "arxiv_id": p.get("arxiv_id")})
+        # slug-dir fallback (last resort, fires when all source_path strategies failed)
+        cand = _slug_dir_candidate(slug)
+        if cand is not None:
+            tier_a.append({"slug": slug, "resolved_path": cand,
+                            "arxiv_id": p.get("arxiv_id")})
     return tier_a
 
 
@@ -985,4 +1016,238 @@ class TestReadSurface:
         combined = (r.stdout + r.stderr).lower()
         assert "traceback" not in combined, (
             f"--claim flag caused a crash:\nstdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+
+
+# ============================================================================
+# Slug-dir fallback: paper whose ONLY source is ~/.paper-scholar/<slug>/*.md
+# ============================================================================
+
+class TestSlugDirFallback:
+    """Resolver fallback: when source_path does not resolve, look in
+    ~/.paper-scholar/<graph-slug>/ for exactly one *.md (ignoring *_meta.json).
+    Monkeypatches the paper-scholar root via env var PAPER_SCHOLAR_DIR so the
+    test runs from a tmp sandbox with no dependency on real disk data.
+    """
+
+    def _build_export(self, tmp_path, slug, source_path_in_export, ps_dir):
+        """Write a fake graph-export.json and return its Path.
+
+        ps_dir: the monkeypatched paper-scholar root (tmp_path / "ps")
+        Creates  ps_dir/<slug>/<arxivid>.md  and  ps_dir/<slug>/<arxivid>_meta.json
+        so the fallback finds exactly one .md.
+        """
+        slug_dir = ps_dir / slug
+        slug_dir.mkdir(parents=True, exist_ok=True)
+        md_file = slug_dir / "2501.99001.md"
+        md_file.write_text(
+            "# Slug-Dir Fallback Paper\n\nFull body text only reachable via slug dir.\n",
+            encoding="utf-8",
+        )
+        # also write a _meta.json — must be ignored by the resolver
+        (slug_dir / "2501.99001_meta.json").write_text("{}", encoding="utf-8")
+
+        fake_export = {
+            "papers": [
+                {
+                    "slug": slug,
+                    "source_path": source_path_in_export,
+                    "arxiv_id": "2501.99001",
+                },
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        return export_path
+
+    def _run_sync_with_ps(self, tmp_path, slug, source_path_in_export):
+        """Run sync with PAPER_SCHOLAR_DIR monkeypatched to a tmp sandbox."""
+        ps_dir = tmp_path / "ps"
+        export_path = self._build_export(tmp_path, slug, source_path_in_export, ps_dir)
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        meta_out = tmp_path / ".vault-meta" / "graph"
+        meta_out.mkdir(parents=True)
+
+        env = os.environ.copy()
+        env["PAPER_SCHOLAR_DIR"] = str(ps_dir)
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(meta_out / "chunks"),
+            "--bm25-dir", str(meta_out / "bm25"),
+            env=env,
+        )
+        return rc, stdout, stderr, papers_out, ps_dir
+
+    def test_slug_dir_fallback_writes_full_md(self, tmp_path):
+        """A paper whose source_path does not resolve but whose slug matches a
+        directory in PAPER_SCHOLAR_DIR with exactly one .md must get a .full.md
+        written via the slug-dir fallback."""
+        slug = "slug-fallback-paper"
+        # source_path points at a non-existent stale PDF — current resolver skips it
+        stale_pdf = str(tmp_path / "inbox" / f"{slug}.pdf")
+
+        rc, stdout, stderr, papers_out, ps_dir = self._run_sync_with_ps(
+            tmp_path, slug, stale_pdf
+        )
+        assert rc == 0, f"exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+
+        full_md = papers_out / f"{slug}.full.md"
+        assert full_md.exists(), (
+            f"{slug}.full.md was NOT written — slug-dir fallback not implemented.\n"
+            f"ps_dir={ps_dir}\nstdout={stdout}\nstderr={stderr}"
+        )
+
+    def test_slug_dir_fallback_body_byte_equal(self, tmp_path):
+        """Body of the fallback .full.md must be byte-equal to the ps slug dir .md."""
+        slug = "slug-fallback-body-check"
+        stale_pdf = str(tmp_path / "inbox" / f"{slug}.pdf")
+
+        rc, stdout, stderr, papers_out, ps_dir = self._run_sync_with_ps(
+            tmp_path, slug, stale_pdf
+        )
+        assert rc == 0, f"exit {rc}\nstderr: {stderr}"
+
+        full_md = papers_out / f"{slug}.full.md"
+        if not full_md.exists():
+            pytest.skip("slug-dir fallback not yet implemented — skipping body check")
+
+        src_md = ps_dir / slug / "2501.99001.md"
+        src_bytes = src_md.read_bytes()
+
+        full_text = full_md.read_text(encoding="utf-8")
+        body = _body_after_frontmatter(full_text)
+        assert body.encode("utf-8") == src_bytes, (
+            "Fallback .full.md body is not byte-equal to the source .md"
+        )
+
+    def test_slug_dir_fallback_zero_md_skips(self, tmp_path):
+        """If the slug dir in paper-scholar has NO .md files, the paper is skipped
+        (no guessing), and sync exits 0."""
+        slug = "slug-fallback-zero-md"
+        stale_pdf = str(tmp_path / "inbox" / f"{slug}.pdf")
+
+        ps_dir = tmp_path / "ps"
+        slug_dir = ps_dir / slug
+        slug_dir.mkdir(parents=True)
+        # Write only a _meta.json, no .md
+        (slug_dir / "2501.99999_meta.json").write_text("{}", encoding="utf-8")
+
+        fake_export = {
+            "papers": [{"slug": slug, "source_path": stale_pdf, "arxiv_id": None}],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        meta_out = tmp_path / ".vault-meta" / "graph"
+        meta_out.mkdir(parents=True)
+        env = os.environ.copy()
+        env["PAPER_SCHOLAR_DIR"] = str(ps_dir)
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(meta_out / "chunks"),
+            "--bm25-dir", str(meta_out / "bm25"),
+            env=env,
+        )
+        assert rc == 0, f"exit {rc}\nstderr: {stderr}"
+        assert not (papers_out / f"{slug}.full.md").exists(), (
+            "slug-dir with zero .md files should be skipped — no .full.md"
+        )
+
+    def test_slug_dir_fallback_multi_md_skips(self, tmp_path):
+        """If the slug dir in paper-scholar has >1 .md files, the paper is skipped
+        (ambiguous, no guessing), and sync exits 0."""
+        slug = "slug-fallback-multi-md"
+        stale_pdf = str(tmp_path / "inbox" / f"{slug}.pdf")
+
+        ps_dir = tmp_path / "ps"
+        slug_dir = ps_dir / slug
+        slug_dir.mkdir(parents=True)
+        # Write two .md files — ambiguous
+        (slug_dir / "2501.00001.md").write_text("# Paper A", encoding="utf-8")
+        (slug_dir / "2501.00002.md").write_text("# Paper B", encoding="utf-8")
+
+        fake_export = {
+            "papers": [{"slug": slug, "source_path": stale_pdf, "arxiv_id": None}],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        meta_out = tmp_path / ".vault-meta" / "graph"
+        meta_out.mkdir(parents=True)
+        env = os.environ.copy()
+        env["PAPER_SCHOLAR_DIR"] = str(ps_dir)
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(meta_out / "chunks"),
+            "--bm25-dir", str(meta_out / "bm25"),
+            env=env,
+        )
+        assert rc == 0, f"exit {rc}\nstderr: {stderr}"
+        assert not (papers_out / f"{slug}.full.md").exists(), (
+            "slug-dir with >1 .md files should be skipped — no .full.md"
+        )
+
+    def test_slug_dir_fallback_does_not_affect_direct_md_resolution(self, tmp_path):
+        """Existing Tier-A direct .md resolution must still work when PAPER_SCHOLAR_DIR
+        is set. The fallback must only fire when prior strategies fail."""
+        slug = "slug-direct-still-works"
+        src_file = tmp_path / "direct.md"
+        src_file.write_text("# Direct MD\n\nBody from direct path.", encoding="utf-8")
+
+        ps_dir = tmp_path / "ps"
+        # also put an .md in the slug dir — should NOT override the direct path
+        slug_dir = ps_dir / slug
+        slug_dir.mkdir(parents=True)
+        (slug_dir / "2501.00099.md").write_text("# PS dir version", encoding="utf-8")
+
+        fake_export = {
+            "papers": [{"slug": slug, "source_path": str(src_file), "arxiv_id": None}],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        meta_out = tmp_path / ".vault-meta" / "graph"
+        meta_out.mkdir(parents=True)
+        env = os.environ.copy()
+        env["PAPER_SCHOLAR_DIR"] = str(ps_dir)
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(meta_out / "chunks"),
+            "--bm25-dir", str(meta_out / "bm25"),
+            env=env,
+        )
+        assert rc == 0, f"exit {rc}\nstderr: {stderr}"
+
+        full_md = papers_out / f"{slug}.full.md"
+        assert full_md.exists(), ".full.md not written even for direct .md path"
+
+        full_text = full_md.read_text(encoding="utf-8")
+        body = _body_after_frontmatter(full_text)
+        # Body must come from direct source, not the ps-dir version
+        assert "Direct MD" in body or "Body from direct path" in body, (
+            "Fallback overwrote the direct-path resolution — priority bug"
         )

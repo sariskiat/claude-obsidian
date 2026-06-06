@@ -1383,3 +1383,188 @@ class TestQueryDedup:
             "Distinct paper was pushed out of top-3 by duplicate slugs. "
             f"Candidates: {[c.get('chunk_id') for c in candidates]}"
         )
+
+
+# ============================================================================
+# Bug fix: --paper and --claim must return chunks for duplicate-slug twins
+# ============================================================================
+
+class TestPaperClaimDedupTwin:
+    """--paper <slug> and --claim <id> must return non-empty candidates for a
+    paper that has a duplicate-slug twin (identical body indexed under two slugs).
+
+    Covers the ted-viton regression: BM25-slug-query ranks the paper's own
+    chunks outside the top-N when common words match many other papers.
+    The fix must load chunks directly from the chunk store by computed address
+    (not via BM25 query + page_path suffix filter).
+    """
+
+    SLUG_A = "dup-twin-short"
+    SLUG_B = "dup-twin-long-variant-same-body"
+    SLUG_DISTINCT = "distinct-unrelated-paper-xyz"
+    CLAIM_ID = 7777
+
+    # Body shared by slug A and slug B — identical bytes
+    TWIN_BODY = (
+        "# DupTwin Paper\n\n"
+        "This paper proposes a novel approach using advanced transformer architecture "
+        "for virtual try-on with garment rendering and DensePose alignment.\n\n"
+        "Experiments show SOTA results on VITON-HD and DressCode. "
+        "The method is training-free and achieves zero-shot transfer.\n\n"
+        "Additional analysis of cross-attention injection patterns is provided."
+    )
+    # Distinct body — completely different content, no overlapping keywords
+    DISTINCT_BODY = (
+        "# Distinct Unrelated Paper XYZ\n\n"
+        "This work examines quantum chromodynamics lattice simulations. "
+        "Completely unrelated to virtual try-on or garment synthesis.\n\n"
+        "Results confirm theoretical predictions of quark confinement."
+    )
+
+    def _build_twin_index(self, tmp_path):
+        """Sync twin slugs A+B (same body) plus one distinct paper.
+
+        Returns (export_path, chunks_dir, bm25_dir, papers_out).
+        """
+        src_a = tmp_path / f"{self.SLUG_A}.md"
+        src_a.write_text(self.TWIN_BODY, encoding="utf-8")
+        src_b = tmp_path / f"{self.SLUG_B}.md"
+        src_b.write_text(self.TWIN_BODY, encoding="utf-8")
+        src_d = tmp_path / f"{self.SLUG_DISTINCT}.md"
+        src_d.write_text(self.DISTINCT_BODY, encoding="utf-8")
+
+        fake_export = {
+            "papers": [
+                {"slug": self.SLUG_A, "source_path": str(src_a), "arxiv_id": None},
+                {"slug": self.SLUG_B, "source_path": str(src_b), "arxiv_id": None},
+                {"slug": self.SLUG_DISTINCT, "source_path": str(src_d), "arxiv_id": None},
+            ],
+            "entities": [],
+            "claims": [
+                {
+                    "id": self.CLAIM_ID,
+                    "subject_id": 1,
+                    "predicate": "uses",
+                    "object_id": 2,
+                    "polarity": "asserts",
+                    "source_paper": self.SLUG_B,
+                }
+            ],
+            "sections": [],
+            "paper_authors": [],
+            "predicates": [],
+            "entity_edges": [],
+            "citation_links": [],
+            "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+        )
+        assert rc == 0, f"sync failed: exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+        return export_path, chunks_dir, bm25_dir, papers_out
+
+    def _retrieve_paper(self, slug, chunks_dir, bm25_dir, export_path, top=2) -> list:
+        """Run graph-retrieve.py --paper <slug> and return candidates list."""
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "--paper", slug,
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--export", str(export_path),
+            "--top", str(top),
+            "--no-rerank",
+        ]
+        r = subprocess.run(
+            cmd, capture_output=True, text=True,
+            cwd=PROJECT_ROOT, timeout=30,
+        )
+        assert r.returncode == 0, (
+            f"graph-retrieve.py --paper {slug} exited {r.returncode}\n"
+            f"stdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+        return json.loads(r.stdout).get("candidates", [])
+
+    def _retrieve_claim(self, claim_id, chunks_dir, bm25_dir, export_path, top=2) -> list:
+        """Run graph-retrieve.py --claim <id> and return candidates list."""
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "--claim", str(claim_id),
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--export", str(export_path),
+            "--top", str(top),
+            "--no-rerank",
+        ]
+        r = subprocess.run(
+            cmd, capture_output=True, text=True,
+            cwd=PROJECT_ROOT, timeout=30,
+        )
+        assert r.returncode == 0, (
+            f"graph-retrieve.py --claim {claim_id} exited {r.returncode}\n"
+            f"stdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+        return json.loads(r.stdout).get("candidates", [])
+
+    def test_paper_slug_a_returns_nonempty(self, tmp_path):
+        """--paper <slug_A> must return >=1 candidate even when slug_B shares the
+        same body and common-word BM25 would rank twins' chunks outside top-N."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        export_path, chunks_dir, bm25_dir, papers_out = self._build_twin_index(tmp_path)
+        candidates = self._retrieve_paper(self.SLUG_A, chunks_dir, bm25_dir, export_path)
+        assert len(candidates) > 0, (
+            f"--paper {self.SLUG_A} returned [] even though its body is indexed. "
+            "BM25-slug-query fails for common-word slugs. "
+            "Fix: load chunks directly from chunk store by computed address."
+        )
+
+    def test_paper_slug_b_returns_nonempty(self, tmp_path):
+        """--paper <slug_B> (the longer twin) must also return >=1 candidate."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        export_path, chunks_dir, bm25_dir, papers_out = self._build_twin_index(tmp_path)
+        candidates = self._retrieve_paper(self.SLUG_B, chunks_dir, bm25_dir, export_path)
+        assert len(candidates) > 0, (
+            f"--paper {self.SLUG_B} returned [] even though its body is indexed. "
+            "Twin slug with longer name is not in BM25 top-N for common words. "
+            "Fix: load chunks directly from chunk store by computed address."
+        )
+
+    def test_claim_resolves_to_nonempty_candidates(self, tmp_path):
+        """--claim <id> whose source_paper is slug_B must return >=1 candidate."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        export_path, chunks_dir, bm25_dir, papers_out = self._build_twin_index(tmp_path)
+        candidates = self._retrieve_claim(self.CLAIM_ID, chunks_dir, bm25_dir, export_path)
+        assert len(candidates) > 0, (
+            f"--claim {self.CLAIM_ID} (source_paper={self.SLUG_B!r}) returned []. "
+            "Claim->slug->BM25 path fails when slug words are common. "
+            "Fix: load chunks directly from chunk store by computed address."
+        )
+
+    def test_paper_slug_a_candidates_belong_to_slug_a(self, tmp_path):
+        """Candidates from --paper slug_A must have page_path containing slug_A
+        (not slug_B or distinct paper)."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        export_path, chunks_dir, bm25_dir, papers_out = self._build_twin_index(tmp_path)
+        candidates = self._retrieve_paper(self.SLUG_A, chunks_dir, bm25_dir, export_path)
+        if not candidates:
+            pytest.skip("no candidates — covered by test_paper_slug_a_returns_nonempty")
+        for c in candidates:
+            page_path = c.get("page_path") or ""
+            assert self.SLUG_A in page_path, (
+                f"Candidate page_path {page_path!r} does not contain {self.SLUG_A!r}. "
+                "Direct-load fix must preserve provenance."
+            )

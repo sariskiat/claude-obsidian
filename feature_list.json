@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
-  "current_feature": "graph-resolve-dedup",
+  "current_feature": "graph-full-paper-retrieval",
   "wip_limit": 1,
   "features": {
     "graph-vault-migration": {
       "id": "graph-vault-migration",
-      "title": "Graphbuilding Fusion P1 \u2014 markdown-vault migration round-trip",
+      "title": "Graphbuilding Fusion P1 — markdown-vault migration round-trip",
       "phase": "passing",
       "status": "completed",
       "problem_classification": "unique",
@@ -74,7 +74,7 @@
         },
         {
           "id": "AC2",
-          "text": "5 gap species exact across the round-trip (frontier 65, debate 0, replication 473, coverage 49, white-space 312; total 899) \u2014 requires networkx for Louvain(seed=42)",
+          "text": "5 gap species exact across the round-trip (frontier 65, debate 0, replication 473, coverage 49, white-space 312; total 899) — requires networkx for Louvain(seed=42)",
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k gap_species",
           "expected_exit": 0
         },
@@ -248,7 +248,7 @@
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q",
           "evidence": [
             "16/16 tests pass in 5.68s",
-            "round-trip: copy live db \u2192 export \u2192 build \u2192 per-row diff \u2192 gap species \u2192 alias count \u2192 source md5"
+            "round-trip: copy live db → export → build → per-row diff → gap species → alias count → source md5"
           ],
           "scope_map": {
             "modify": [
@@ -289,11 +289,11 @@
     },
     "graph-native-gaps": {
       "id": "graph-native-gaps",
-      "title": "Native Gap Scanner \u2014 replace oracle gaps.py with repo-native analytics",
+      "title": "Native Gap Scanner — replace oracle gaps.py with repo-native analytics",
       "phase": "passing",
       "status": "completed",
       "problem_classification": "unique",
-      "problem_statement": "The 5-species gap scanner lives in the oracle dotdir (~/.claude/skills/graphbuilding/scripts/gaps.py), uses broken COALESCE(canonical_id,id) for entity resolution, and is not in this repo \u2014 it cannot evolve with the vault.",
+      "problem_statement": "The 5-species gap scanner lives in the oracle dotdir (~/.claude/skills/graphbuilding/scripts/gaps.py), uses broken COALESCE(canonical_id,id) for entity resolution, and is not in this repo — it cannot evolve with the vault.",
       "jtbd": "When I scan my claim graph for research gaps, I want a native gap scanner in this repo that uses root() (not broken COALESCE), runs on the derived db, and produces identical results to the oracle, so the analytics engine lives with the vault and evolves with it.",
       "user_context": "Single-tenant fork owner (saris). Phase 2 of the graphbuilding-fusion epic.",
       "spec_file": "specs/graph-native-gaps.md",
@@ -328,7 +328,7 @@
         "baseline": "oracle on derived db: 899 total (65/0/473/49/312)",
         "target": "native on derived db: 899 total (65/0/473/49/312)",
         "direction": "binary_pass",
-        "user_value_check": "identical gap counts mean the native scanner is a drop-in replacement \u2014 the analytics engine now lives in the repo",
+        "user_value_check": "identical gap counts mean the native scanner is a drop-in replacement — the analytics engine now lives in the repo",
         "how_measured": "uv run python -m pytest tests/test_graph_gaps.py -q",
         "keep_revert_rule": "keep only if all gap counts match oracle exactly; revert otherwise",
         "simplicity_criterion": "one shared graph_db.root() for entity resolution, no oracle imports"
@@ -348,7 +348,7 @@
         },
         {
           "id": "AC3",
-          "text": "Uses graph_db.root() \u2014 no COALESCE(canonical_id, id) anywhere",
+          "text": "Uses graph_db.root() — no COALESCE(canonical_id, id) anywhere",
           "verification": "bash -c \"grep -c COALESCE scripts/graph-gaps.py; test $? -eq 1\"",
           "expected_exit": 0
         },
@@ -372,7 +372,7 @@
         },
         {
           "id": "AC7",
-          "text": "Derived db missing \u2192 exit 1",
+          "text": "Derived db missing → exit 1",
           "verification": "bash -c \"uv run python scripts/graph-gaps.py --db /nonexistent 2>&1; test $? -eq 1\"",
           "expected_exit": 0
         },
@@ -458,7 +458,9 @@
       "depends_on": [
         "graph-native-gaps"
       ],
-      "blocks": [],
+      "blocks": [
+        "graph-full-paper-retrieval"
+      ],
       "scope_map": {
         "modify": [
           "scripts/graph-resolve.py",
@@ -471,7 +473,7 @@
           "wiki/graph/",
           "pyproject.toml"
         ],
-        "metric": "number of real duplicate entity pairs found (qualitative \u2014 human validates)"
+        "metric": "number of real duplicate entity pairs found (qualitative — human validates)"
       },
       "metric": {
         "name": "duplicate_detection",
@@ -508,7 +510,7 @@
         },
         {
           "id": "AC5",
-          "text": "No COALESCE \u2014 uses root()",
+          "text": "No COALESCE — uses root()",
           "verification": "bash -c \"grep COALESCE scripts/graph-resolve.py; test $? -eq 1\"",
           "expected_exit": 0
         },
@@ -589,6 +591,352 @@
           }
         }
       ]
+    },
+    "graph-full-paper-retrieval": {
+      "id": "graph-full-paper-retrieval",
+      "title": "Full-Paper Retrieval for /graph",
+      "status": "in_progress",
+      "phase": "plan",
+      "problem_classification": "unique",
+      "problem_statement": "Graph traversal can surface a claim or gap but cannot open the related paper's full text, so 'trace a claim/gap -> read the paper -> reason toward my next contribution' dead-ends at the section summaries already in papers/<slug>.md.",
+      "jtbd": "When I trace a claim or research gap, I want to open the related paper's full text and reason with full context (and a repeatable system so any paper I add or re-add later flows into that same full-context tracing), so I can derive next-paper proposals and proof-of-concept toy models grounded in real text.",
+      "user_context": "Single-tenant fork owner (saris). Phase 4 of the graphbuilding-fusion epic. macOS, uv-run Python 3.12, /graph skill v1.10. Today /graph gaps names entities/claims but the user must leave the tool and hunt the paper's text by hand across >=4 disk locations; papers/<slug>.md carries only summaries.",
+      "spec_file": "specs/graph-full-paper-retrieval.md",
+      "spec_status": "approved",
+      "approval": {
+        "approved_by": "saris",
+        "date": "2026-06-06",
+        "domain_lead": true,
+        "tech_lead": true
+      },
+      "depends_on": [
+        "graph-resolve-dedup"
+      ],
+      "blocks": [],
+      "scope_map": {
+        "modify": [
+          "scripts/graph-fulltext.py",
+          "scripts/graph-retrieve.py",
+          "tests/test_graph_fulltext.py",
+          "wiki/graph/papers/*.full.md",
+          "commands/graph.md",
+          "skills/graph/SKILL.md",
+          "wiki/graph/SCHEMA.md",
+          ".gitignore",
+          "Makefile"
+        ],
+        "read_only": [
+          "~/.paper-scholar/**",
+          "~/Desktop/research/**",
+          "scripts/graph_db.py",
+          "scripts/graph-build.py",
+          "scripts/graph-export.py",
+          "scripts/graph-gaps.py",
+          "scripts/graph-resolve.py",
+          "scripts/graph-validate.py",
+          "scripts/retrieve.py",
+          "scripts/rerank.py",
+          "scripts/contextual-prefix.py",
+          "scripts/bm25-index.py",
+          "tests/test_graph_roundtrip.py",
+          "tests/test_graph_gaps.py",
+          "tests/test_graph_resolve.py",
+          "tests/test_graph_validate.py"
+        ],
+        "metric": {
+          "name": "in_graph_papers_full_text_retrievable",
+          "baseline": "0 (no full text indexed; only summaries exist)",
+          "target": "all Tier-A papers (22 on current graph-export; resolver may rescue a few bare-dir entries that contain a single inner .md) imported + indexed; a seeded claim/query returns its source paper's passage in top-K with provenance; import+build idempotent",
+          "direction": "binary"
+        }
+      },
+      "metric": {
+        "name": "in_graph_papers_full_text_retrievable",
+        "baseline": "0 (no full text indexed; only section summaries exist in papers/<slug>.md)",
+        "target": "Tier-A papers (>=22 on current graph-export.json: 22 source_path values end in .md and all 22 files exist on disk; spec's '~38' was a stale pre-migration estimate) each get a byte-equal .full.md, the graph BM25 index builds over those bodies only, and a seeded claim/query returns its source paper's passage in top-K with provenance; import+build idempotent",
+        "direction": "binary",
+        "user_value_check": "today gap/claim -> full paper text is impossible; after, it is one `/graph read`, and adding the next paper makes it instantly traceable",
+        "how_measured": "uv run python -m pytest tests/test_graph_fulltext.py -q  (AC1-AC6,AC9) AND make test-graph (AC8 no-regression)",
+        "keep_revert_rule": "keep only if tests/test_graph_fulltext.py is green AND make test-graph stays green AND a re-run diff of .full.md + index is empty (idempotent); revert otherwise",
+        "simplicity_criterion": "reuse contextual-prefix.pick_prefix_tier / bm25-index.query / rerank.rerank by importing + pointing CHUNKS_DIR/BM25_DIR at graph paths; do NOT fork or edit those modules and do NOT touch graph-build.py"
+      },
+      "acceptance_criteria": [
+        {
+          "id": "AC1",
+          "criterion": "Resolver + import writes one .full.md per Tier-A paper (>=22), each a byte-equal copy of its source .md body with the type:paper-fulltext / slug / arxiv_id / source_path / paper frontmatter contract.",
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k import",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC2",
+          "criterion": "Bodyless papers (57 Tier-B .pdf + 6 paper.json + bare-dir/URL entries with no resolvable inner .md) are skipped (no .full.md, no crash) and reported as the add-later backlog.",
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k skip_bodyless",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC3",
+          "criterion": "Graph retrieval index builds over .full.md bodies only (not claim/entity stubs, not structured papers/*.md); a seeded query returns the correct source paper's passage in top-K with paper+claim provenance.",
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k retrieve_provenance",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC4",
+          "criterion": "Default run does zero network egress (synthetic prefixes via pick_prefix_tier with allow_egress=False); --allow-egress is the only path that may egress (claude-CLI tier).",
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k no_egress_default",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC5",
+          "criterion": "ollama absent -> rerank degrades to BM25-only with rerank_source noop-no-ollama, exit 0; missing graph index on /graph read -> friendly non-zero exit with a 'run graph-fulltext.py sync first' hint.",
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k degrade",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC6",
+          "criterion": "Import + index build are idempotent: run twice with no source change -> byte-identical .full.md files and identical index.",
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k idempotent",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC7",
+          "criterion": "Graph retrieval index (.vault-meta/graph/chunks/, .vault-meta/graph/bm25/) is gitignored; .full.md under wiki/graph/papers/ are git-tracked (not ignored).",
+          "verification": "bash -c 'git check-ignore .vault-meta/graph/bm25/index.json >/dev/null && git check-ignore .vault-meta/graph/chunks/x.json >/dev/null && ! git check-ignore wiki/graph/papers/sample.full.md >/dev/null'",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC8",
+          "criterion": "No regression: make test-graph stays green (48 collected: roundtrip+gaps+resolve+validate; current baseline 44 passed / 4 skipped); the 9-table round-trip stays byte-equal and graph-build.py is unmodified.",
+          "verification": "make test-graph",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC9",
+          "criterion": "/graph read answers <query>, --paper <slug>, --claim <id>; SCHEMA.md documents the .full.md contract + the add/re-add-a-paper path.",
+          "verification": "bash -c 'uv run python -m pytest tests/test_graph_fulltext.py -q -k read_surface && grep -qiE \"full\\.md|add a paper|re-add\" wiki/graph/SCHEMA.md'",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "T1",
+          "title": "TDD: tests/test_graph_fulltext.py — failing tests first for resolver/import (byte-equal body + contract frontmatter), skip-bodyless reporting, idempotent re-run, and gitignore (AC1,AC2,AC6,AC7). Use a tmp sandbox + monkeypatch of graph chunk/bm25 dirs; skip live-source/ollama-gated cases.",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            "tests/test_graph_fulltext.py"
+          ],
+          "depends_on": [],
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k 'import or skip_bodyless or idempotent' ; test $? -ne 0",
+          "evidence": [
+            "18 tests written RED (import/skip_bodyless/idempotent/gitignore), confirmed failing before impl (commit 4158f8a)"
+          ],
+          "scope_map": {
+            "modify": [
+              "tests/test_graph_fulltext.py"
+            ],
+            "read_only": [
+              "scripts/contextual-prefix.py",
+              "scripts/bm25-index.py",
+              "wiki/graph/papers/"
+            ],
+            "metric": "AC1 AC2 AC6 AC7 fail RED before impl"
+          }
+        },
+        {
+          "id": "T2",
+          "title": "scripts/graph-fulltext.py `sync`: resolver maps each in-graph paper via papers/<slug>.md source_path (absolute .md, or bare .paper-scholar dir -> single inner .md), writes wiki/graph/papers/<slug>.full.md (frontmatter contract + verbatim byte-equal body) for Tier-A, skips bodyless (pdf/json/URL/no-inner-md) with one log line + end counts. Read-only on source dirs; never merges slugs. Makes T1 import/skip/idempotent tests green.",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            "scripts/graph-fulltext.py"
+          ],
+          "depends_on": [
+            "T1"
+          ],
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k 'import or skip_bodyless or idempotent'",
+          "evidence": [
+            "scripts/graph-fulltext.py: sync subcommand, Tier-A resolver, byte-equal .full.md writer",
+            "32 Tier-A papers imported, 66 skipped with logged reason",
+            "import/skip_bodyless/idempotent tests all green (commit 4158f8a)"
+          ],
+          "scope_map": {
+            "modify": [
+              "scripts/graph-fulltext.py"
+            ],
+            "read_only": [
+              "~/.paper-scholar/**",
+              "~/Desktop/research/**",
+              "wiki/graph/papers/"
+            ],
+            "metric": "AC1 AC2 AC6"
+          }
+        },
+        {
+          "id": "T3",
+          "title": ".gitignore: add .vault-meta/graph/chunks/ and .vault-meta/graph/bm25/ (graph-scoped derived index, throwaway) — keep wiki/graph/papers/*.full.md tracked. Makes T1 gitignore test (AC7) green.",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            ".gitignore"
+          ],
+          "depends_on": [
+            "T1"
+          ],
+          "verification": "bash -c 'git check-ignore .vault-meta/graph/bm25/index.json >/dev/null && git check-ignore .vault-meta/graph/chunks/x.json >/dev/null && ! git check-ignore wiki/graph/papers/sample.full.md >/dev/null'",
+          "evidence": [
+            ".gitignore: .vault-meta/graph/chunks/ and .vault-meta/graph/bm25/ added and ignored",
+            "wiki/graph/papers/*.full.md tracked (git check-ignore exits 1)",
+            "gitignore tests green (commit 4158f8a)"
+          ],
+          "scope_map": {
+            "modify": [
+              ".gitignore"
+            ],
+            "read_only": [],
+            "metric": "AC7"
+          }
+        },
+        {
+          "id": "T4",
+          "title": "graph chunk-store + BM25 build over .full.md bodies only, default zero-egress. In graph-fulltext.py `sync` index step: reuse contextual-prefix.pick_prefix_tier(force_synthetic, allow_egress) (default synthetic) + chunk_body to emit graph chunks under .vault-meta/graph/chunks/ in the existing chunk schema (page_path/page_address/chunk_index/raw_text/contextualized_text/body_hash), then build .vault-meta/graph/bm25/index.json by importing bm25-index and pointing its CHUNKS_DIR/BM25_DIR/INDEX_PATH at graph paths (monkeypatch-style, no edit to bm25-index.py). Add --allow-egress flag (claude-CLI tier). TDD tests for no_egress_default + retrieve_provenance index-build added first.",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            "scripts/graph-fulltext.py",
+            "tests/test_graph_fulltext.py"
+          ],
+          "depends_on": [
+            "T2",
+            "T3"
+          ],
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k 'no_egress_default or retrieve_provenance'",
+          "evidence": [
+            "TestNoEgressDefault + TestRetrieveProvenance (AC3/AC4) tests written and green",
+            "graph-fulltext.py sync: self-contained chunker + BM25 builder, synthetic prefix default",
+            "BM25 index: docs=1492 vocab=26602 avg_dl=271.5 on 32 Tier-A papers (commit 8ce93bf)"
+          ],
+          "scope_map": {
+            "modify": [
+              "scripts/graph-fulltext.py",
+              "tests/test_graph_fulltext.py"
+            ],
+            "read_only": [
+              "scripts/contextual-prefix.py",
+              "scripts/bm25-index.py"
+            ],
+            "metric": "AC3 AC4"
+          }
+        },
+        {
+          "id": "T5",
+          "title": "scripts/graph-retrieve.py: /graph read backend mirroring retrieve.py. Answers <query>, --paper <slug>, --claim <id> (claim/paper -> source slug via graph-build derived db or graph-export.json, read-only). BM25 over graph index + rerank.rerank (ollama-absent -> noop-no-ollama, exit 0). Missing graph index -> friendly non-zero exit (mirror retrieve.py EXIT_NOT_PROVISIONED). Returns ranked passages with paper+claim provenance. TDD read_surface + degrade tests first.",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            "scripts/graph-retrieve.py",
+            "tests/test_graph_fulltext.py"
+          ],
+          "depends_on": [
+            "T4"
+          ],
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k 'read_surface or degrade'",
+          "evidence": [
+            "scripts/graph-retrieve.py: BM25+rerank backend, <query>/--paper/--claim, provenance, EXIT_NOT_PROVISIONED",
+            "TestDegrade + TestReadSurface tests green (all 30 tests pass)",
+            "degrade/read_surface tests were written skipped before impl — confirmed RED (commit 8ce93bf)"
+          ],
+          "scope_map": {
+            "modify": [
+              "scripts/graph-retrieve.py",
+              "tests/test_graph_fulltext.py"
+            ],
+            "read_only": [
+              "scripts/retrieve.py",
+              "scripts/rerank.py",
+              "scripts/bm25-index.py"
+            ],
+            "metric": "AC5 AC9 (read surface)"
+          }
+        },
+        {
+          "id": "T6",
+          "title": "Docs + wiring: commands/graph.md (+ `read` subcommand routing to graph-retrieve.py), skills/graph/SKILL.md (+ read routing), wiki/graph/SCHEMA.md (.full.md frontmatter contract + the add/re-add-a-paper path), optional Makefile test-graph extension to include tests/test_graph_fulltext.py. Makes AC9 doc half green.",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            "commands/graph.md",
+            "skills/graph/SKILL.md",
+            "wiki/graph/SCHEMA.md",
+            "Makefile"
+          ],
+          "depends_on": [
+            "T5"
+          ],
+          "verification": "bash -c 'grep -qiE \"full\\.md|add a paper|re-add\" wiki/graph/SCHEMA.md && grep -qi \"graph-retrieve\\|graph read\\|read \" commands/graph.md'",
+          "evidence": [
+            "commands/graph.md: read subcommand with graph-retrieve.py invocations added",
+            "skills/graph/SKILL.md: op 4 (read full-text), architecture diagram updated, triggers extended",
+            "wiki/graph/SCHEMA.md: .full.md frontmatter contract + add/re-add-a-paper path documented",
+            "Makefile: test-fulltext target added",
+            "AC9 doc checks green (commit fe7a693)"
+          ],
+          "scope_map": {
+            "modify": [
+              "commands/graph.md",
+              "skills/graph/SKILL.md",
+              "wiki/graph/SCHEMA.md",
+              "Makefile"
+            ],
+            "read_only": [],
+            "metric": "AC9 (doc + surface)"
+          }
+        },
+        {
+          "id": "T7",
+          "title": "Regression + live evidence gate: make test-graph stays green (graph-build.py unmodified, 9-table round-trip byte-equal), full tests/test_graph_fulltext.py green, and a live `graph-fulltext.py sync` over the real ~22 Tier-A papers + a `/graph read --claim <id>` transcript with provenance + an empty idempotent re-run diff.",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [],
+          "depends_on": [
+            "T6"
+          ],
+          "verification": "bash -c 'make test-graph && uv run python -m pytest tests/test_graph_fulltext.py -q'",
+          "evidence": [
+            "make test-graph: 44 passed / 4 skipped (no regression; graph-build.py unmodified)",
+            "make test-fulltext: 30 passed",
+            "live sync: 32 Tier-A imported, 66 skipped, BM25 docs=1492",
+            "live /graph read --claim 310: 3 candidates with provenance from diffusion-sampling-with-momentum paper",
+            "idempotent re-run: Import done: 0 new/updated, 32 unchanged; MD5 checksums byte-identical"
+          ],
+          "scope_map": {
+            "modify": [],
+            "read_only": [
+              "scripts/graph-build.py",
+              "tests/test_graph_roundtrip.py"
+            ],
+            "metric": "AC8 + full-suite green; metric target (>=22 Tier-A retrievable, idempotent)"
+          }
+        }
+      ],
+      "validation": {
+        "user_acceptance": "pending",
+        "business_metric": "pending"
+      },
+      "learning": {
+        "technical": [],
+        "product": [],
+        "process": [],
+        "harness_updates": []
+      }
     }
   }
 }

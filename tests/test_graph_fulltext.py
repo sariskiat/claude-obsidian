@@ -1568,3 +1568,134 @@ class TestPaperClaimDedupTwin:
                 f"Candidate page_path {page_path!r} does not contain {self.SLUG_A!r}. "
                 "Direct-load fix must preserve provenance."
             )
+
+
+# ============================================================================
+# Edge case: --paper <unknown-slug> must exit non-zero (mirror --claim behavior)
+# ============================================================================
+
+class TestUnknownPaperNonzeroExit:
+    """Spec edge-case: --paper <slug> with a slug that has zero chunks in the
+    index must print a friendly stderr message and exit non-zero (exit 2,
+    matching unknown --claim behavior).
+
+    A KNOWN --paper must still exit 0.
+    A free-text query with no hits must still exit 0 (not affected).
+    """
+
+    def _build_single_paper_index(self, tmp_path):
+        """Sync a single known paper. Returns (chunks_dir, bm25_dir, export_path)."""
+        src_file = tmp_path / "known-paper.md"
+        src_file.write_text(
+            "# Known Paper\n\nContent about diffusion models and garment synthesis.",
+            encoding="utf-8",
+        )
+        fake_export = {
+            "papers": [
+                {"slug": "known-paper", "source_path": str(src_file), "arxiv_id": None},
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+        )
+        assert rc == 0, f"sync failed: exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+        return chunks_dir, bm25_dir, export_path
+
+    def test_unknown_paper_slug_exits_nonzero(self, tmp_path):
+        """--paper <slug-not-in-index> must exit non-zero with a stderr message."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        chunks_dir, bm25_dir, export_path = self._build_single_paper_index(tmp_path)
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "--paper", "does-not-exist",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--export", str(export_path),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, timeout=30)
+        assert r.returncode != 0, (
+            f"--paper does-not-exist should exit non-zero (got {r.returncode}). "
+            "Unknown slug with zero chunks must mirror unknown --claim behavior (exit 2)."
+        )
+        combined = r.stdout + r.stderr
+        assert combined.strip(), "Expected a non-empty stderr/stdout message for unknown --paper"
+
+    def test_unknown_paper_slug_exits_with_code_2(self, tmp_path):
+        """--paper <unknown> exits exactly 2 (same as unknown --claim)."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        chunks_dir, bm25_dir, export_path = self._build_single_paper_index(tmp_path)
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "--paper", "totally-unknown-slug",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--export", str(export_path),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, timeout=30)
+        assert r.returncode == 2, (
+            f"--paper <unknown> must exit 2, got {r.returncode}. "
+            "Mirror the exit code of unknown --claim (EXIT_USAGE=2)."
+        )
+
+    def test_known_paper_slug_still_exits_zero(self, tmp_path):
+        """--paper <known-slug> (slug present in index) still exits 0 with chunks."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        chunks_dir, bm25_dir, export_path = self._build_single_paper_index(tmp_path)
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "--paper", "known-paper",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--export", str(export_path),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, timeout=30)
+        assert r.returncode == 0, (
+            f"--paper known-paper (indexed) must exit 0, got {r.returncode}. "
+            f"stdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+        out = json.loads(r.stdout)
+        assert len(out.get("candidates", [])) > 0, (
+            "Known paper must return non-empty candidates"
+        )
+
+    def test_free_text_query_no_hits_exits_zero(self, tmp_path):
+        """A free-text query returning zero results must still exit 0 (no change)."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+        chunks_dir, bm25_dir, export_path = self._build_single_paper_index(tmp_path)
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "zzzyyyxxx completely made up query with no matches",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--no-rerank",
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, timeout=30)
+        assert r.returncode == 0, (
+            f"Free-text query with no hits must exit 0, got {r.returncode}. "
+            f"stdout: {r.stdout}\nstderr: {r.stderr}"
+        )

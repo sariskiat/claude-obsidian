@@ -595,8 +595,8 @@
     "graph-full-paper-retrieval": {
       "id": "graph-full-paper-retrieval",
       "title": "Full-Paper Retrieval for /graph",
-      "status": "in_progress",
-      "phase": "plan",
+      "status": "completed",
+      "phase": "passing",
       "problem_classification": "unique",
       "problem_statement": "Graph traversal can surface a claim or gap but cannot open the related paper's full text, so 'trace a claim/gap -> read the paper -> reason toward my next contribution' dead-ends at the section summaries already in papers/<slug>.md.",
       "jtbd": "When I trace a claim or research gap, I want to open the related paper's full text and reason with full context (and a repeatable system so any paper I add or re-add later flows into that same full-context tracing), so I can derive next-paper proposals and proof-of-concept toy models grounded in real text.",
@@ -665,64 +665,82 @@
           "id": "AC1",
           "criterion": "Resolver + import writes one .full.md per Tier-A paper (>=22), each a byte-equal copy of its source .md body with the type:paper-fulltext / slug / arxiv_id / source_path / paper frontmatter contract.",
           "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k import",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "95 .full.md written (>=22 target); real frontmatter verified type:paper-fulltext/slug/arxiv_id/source_path/paper wikilink; body byte-equal. pytest -k 'import' 8 passed"
+          ]
         },
         {
           "id": "AC2",
           "criterion": "Bodyless papers (57 Tier-B .pdf + 6 paper.json + bare-dir/URL entries with no resolvable inner .md) are skipped (no .full.md, no crash) and reported as the add-later backlog.",
-          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k skip_bodyless",
-          "status": "not_started",
-          "evidence": []
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k SkipBodyless",
+          "status": "done",
+          "evidence": [
+            "3 bodyless/non-paper slugs skipped (anthropic-kg-cookbook/multimodal-crop-tool url, bridge-synthesis unknown_type), no crash, reported as backlog. pytest TestSkipBodyless 5 passed"
+          ]
         },
         {
           "id": "AC3",
           "criterion": "Graph retrieval index builds over .full.md bodies only (not claim/entity stubs, not structured papers/*.md); a seeded query returns the correct source paper's passage in top-K with paper+claim provenance.",
-          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k retrieve_provenance",
-          "status": "not_started",
-          "evidence": []
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k RetrieveProvenance",
+          "status": "done",
+          "evidence": [
+            "all 95 chunk page_paths are .full.md under wiki/graph/papers/, 0 stubs; live --claim 310 returns diffusion-sampling paper passages with provenance. pytest TestRetrieveProvenance 6 passed"
+          ]
         },
         {
           "id": "AC4",
           "criterion": "Default run does zero network egress (synthetic prefixes via pick_prefix_tier with allow_egress=False); --allow-egress is the only path that may egress (claude-CLI tier).",
-          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k no_egress_default",
-          "status": "not_started",
-          "evidence": []
+          "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k NoEgressDefault",
+          "status": "done",
+          "evidence": [
+            "all 3297 live chunks prefix_source=synthetic; code default allow_egress=False, --allow-egress opt-in; test asserts every chunk synthetic. pytest TestNoEgressDefault 2 passed"
+          ]
         },
         {
           "id": "AC5",
           "criterion": "ollama absent -> rerank degrades to BM25-only with rerank_source noop-no-ollama, exit 0; missing graph index on /graph read -> friendly non-zero exit with a 'run graph-fulltext.py sync first' hint.",
           "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k degrade",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "missing index -> exit 10 + 'run graph-fulltext.py sync first' hint; ollama absent -> rerank_source skipped/noop-no-ollama exit 0. pytest TestDegrade 2 passed"
+          ]
         },
         {
           "id": "AC6",
           "criterion": "Import + index build are idempotent: run twice with no source change -> byte-identical .full.md files and identical index.",
           "verification": "uv run python -m pytest tests/test_graph_fulltext.py -q -k idempotent",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            ".full.md byte-identical across 3 live re-runs (md5 a8e97c...); BM25 index identical excluding updated_at (docs=3297/vocab=36305 equal); working tree clean. pytest TestIdempotent 2 passed"
+          ]
         },
         {
           "id": "AC7",
           "criterion": "Graph retrieval index (.vault-meta/graph/chunks/, .vault-meta/graph/bm25/) is gitignored; .full.md under wiki/graph/papers/ are git-tracked (not ignored).",
           "verification": "bash -c 'git check-ignore .vault-meta/graph/bm25/index.json >/dev/null && git check-ignore .vault-meta/graph/chunks/x.json >/dev/null && ! git check-ignore wiki/graph/papers/sample.full.md >/dev/null'",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "git check-ignore: .vault-meta/graph/{bm25,chunks} ignored; real .full.md tracked (check-ignore exit 1, git ls-files matched). pytest TestGitignore 3 passed"
+          ]
         },
         {
           "id": "AC8",
           "criterion": "No regression: make test-graph stays green (48 collected: roundtrip+gaps+resolve+validate; current baseline 44 passed / 4 skipped); the 9-table round-trip stays byte-equal and graph-build.py is unmodified.",
           "verification": "make test-graph",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "make test-graph 44 passed/4 skipped (baseline held); graph-build/export/graph_db untouched fcb1c41..HEAD; round-trip byte-equal"
+          ]
         },
         {
           "id": "AC9",
           "criterion": "/graph read answers <query>, --paper <slug>, --claim <id>; SCHEMA.md documents the .full.md contract + the add/re-add-a-paper path.",
-          "verification": "bash -c 'uv run python -m pytest tests/test_graph_fulltext.py -q -k read_surface && grep -qiE \"full\\.md|add a paper|re-add\" wiki/graph/SCHEMA.md'",
-          "status": "not_started",
-          "evidence": []
+          "verification": "bash -c 'uv run python -m pytest tests/test_graph_fulltext.py -q -k ReadSurface && grep -qiE \"full\\.md|add a paper|re-add\" wiki/graph/SCHEMA.md'",
+          "status": "done",
+          "evidence": [
+            "live --paper/--claim/free-query all return ranked passages with paper+claim provenance; SCHEMA.md documents .full.md contract + add/re-add path. pytest TestReadSurface 2 passed; grep green"
+          ]
         }
       ],
       "tasks": [
@@ -928,13 +946,18 @@
         }
       ],
       "validation": {
-        "user_acceptance": "pending",
-        "business_metric": "pending"
+        "user_acceptance": "pending_human",
+        "business_metric": "met: 95 Tier-A papers full-text retrievable via /graph read (target >=22); seeded claim 310 + free query return source-paper passages with provenance; import+build idempotent"
       },
       "learning": {
-        "technical": [],
+        "technical": [
+          "Duplicate graph slugs can point at the same source paper (665 shared body_hashes live): free-text query must dedup by body_hash and --paper/--claim must direct-load via deterministic sha1('graph:<slug>')[:6] address rather than BM25-rank the slug — both fixed post-plan and tested",
+          "BM25 index idempotency is byte-equal only after excluding the updated_at timestamp field; the substantive index is deterministic"
+        ],
         "product": [],
-        "process": [],
+        "process": [
+          "pytest -k matches the literal node-id substring and does not bridge underscores to CamelCase: AC verification commands with -k 'skip_bodyless' silently collect 0 tests (exit 5) against class TestSkipBodyless. Planner -k strings must match real test names. Evaluator must read exit codes, not trust 'no tests ran' as pass."
+        ],
         "harness_updates": []
       }
     }

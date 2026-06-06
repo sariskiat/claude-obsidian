@@ -324,6 +324,13 @@ def main():
     if paper_slug_direct is not None:
         candidates = load_chunks_for_slug(paper_slug_direct, chunks_dir, top_k=args.bm25_top)
         log(f"direct-load ({paper_slug_direct}): {len(candidates)} chunks")
+        if not candidates:
+            # Mirror unknown --claim behavior: friendly message + non-zero exit.
+            if args.paper:
+                log(f"ERR: paper slug '{args.paper}' has no chunks in the graph index.")
+                log("  Run `uv run python scripts/graph-fulltext.py sync` to index this paper,")
+                log("  or check that the slug exists in graph-export.json.")
+            return EXIT_USAGE
         # Apply top-K cut directly — no BM25, no rerank needed for direct retrieval.
         final = candidates[:args.top]
         strategy = "direct-load"

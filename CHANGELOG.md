@@ -25,7 +25,7 @@ Fuses the standalone `graphbuilding` skill (formerly `~/.claude/skills/graphbuil
 
 - `.claude-plugin/plugin.json` + `marketplace.json` version 1.9.2 → 1.10.0; added `knowledge-graph` / `claim-graph` / `research-gaps` / `entity-resolution` keywords.
 - `pyproject.toml` adds PyYAML + networkx (graph deps) under `uv`; `.gitignore` ignores the derived `.vault-meta/graph/graph.db` (the `wiki/graph/` markdown + JSON snapshot are tracked), `.pytest_cache/`, and the local `.claude/` working dir.
-- **Oracle retired** (reversibly): `~/.graphbuilding` and `~/.claude/skills/graphbuilding` moved to `*.retired-20260606`. The plugin is now self-sufficient — full suite runs 44 passed / 4 skipped with the oracle absent (only the round-trip integration tests skip, by design), and the standalone build→gaps→validate pipeline still yields 899 gaps + 0 drift. Restore by renaming the `.retired-*` paths back.
+- **Oracle retired**: `~/.graphbuilding` and `~/.claude/skills/graphbuilding` moved to `*.retired-20260606`, then trashed and the Trash emptied — no longer on disk. The plugin is self-sufficient — full suite runs 44 passed / 4 skipped with the oracle absent (only the round-trip integration tests skip, by design), and the standalone build→gaps→validate pipeline still yields 899 gaps + 0 drift. Migration was verified lossless *before* retirement; truth lives in `wiki/graph/` + `graph-export.json`. (Recover the original oracle only via backup if ever desired; not required.)
 
 ### Removed
 

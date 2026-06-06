@@ -156,9 +156,12 @@ they have been **retired by reversible `mv`**:
 and the standalone pipeline — `graph-build` from markdown → `graph-gaps` → `graph-validate` —
 produces **899 gaps (exact)** and **0 integrity drift**. The plugin needs nothing external.
 
-**To restore** (if you ever want the oracle back): `mv` each `.retired-20260606` path back to
-its original name. The portable truth is already in git (`wiki/graph/` + `graph-export.json`),
-so even the retired copies are not load-bearing.
+**Update 2026-06-06 (later same day):** the `.retired-20260606` copies were subsequently moved
+to Trash and the **Trash was emptied — the oracle is no longer on disk** (incl. the old
+`bridge.py` proposal reference). This is safe: the migration was verified lossless *before*
+retirement and the portable truth is in git (`wiki/graph/` + `graph-export.json`). If the
+original oracle scripts are ever wanted again, recover from a backup (Time Machine) or
+re-clone the source — they are NOT required for the plugin, which is fully self-sufficient.
 
 ---
 

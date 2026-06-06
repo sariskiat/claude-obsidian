@@ -290,7 +290,7 @@
     "graph-native-gaps": {
       "id": "graph-native-gaps",
       "title": "Native Gap Scanner \u2014 replace oracle gaps.py with repo-native analytics",
-      "phase": "plan",
+      "phase": "passing",
       "status": "in_progress",
       "problem_classification": "unique",
       "problem_statement": "The 5-species gap scanner lives in the oracle dotdir (~/.claude/skills/graphbuilding/scripts/gaps.py), uses broken COALESCE(canonical_id,id) for entity resolution, and is not in this repo \u2014 it cannot evolve with the vault.",
@@ -388,13 +388,17 @@
           "id": "T1",
           "title": "scripts/graph-gaps.py: 5-species scanner using graph_db.root(), zero oracle imports",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-gaps.py"
           ],
           "depends_on": [],
           "verification": "uv run python scripts/graph-gaps.py --json --top 1",
-          "evidence": [],
+          "evidence": [
+            "scripts/graph-gaps.py: 5-species scanner using graph_db.root()",
+            "12/12 tests pass",
+            "899 total gaps match oracle"
+          ],
           "scope_map": {
             "modify": [
               "scripts/graph-gaps.py"
@@ -409,7 +413,7 @@
           "id": "T2",
           "title": "tests/test_graph_gaps.py: count parity, schema validation, edge cases",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "tests/test_graph_gaps.py"
           ],
@@ -417,7 +421,10 @@
             "T1"
           ],
           "verification": "uv run python -m pytest tests/test_graph_gaps.py -q",
-          "evidence": [],
+          "evidence": [
+            "tests/test_graph_gaps.py: 12 tests",
+            "count parity, schema validation, edge cases all green"
+          ],
           "scope_map": {
             "modify": [
               "tests/test_graph_gaps.py"

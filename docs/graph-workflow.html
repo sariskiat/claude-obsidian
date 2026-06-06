@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper → Graph Workflow · claude-obsidian v1.10</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1d2130; --ink:#e7e9ee; --mut:#9aa3b2;
+    --line:#2b3040; --purple:#8b5cf6; --purple-dim:#6d28d9;
+    --green:#34d399; --amber:#fbbf24; --red:#f87171; --blue:#60a5fa; --cyan:#22d3ee;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0c0e14,#0f1117 240px);color:var(--ink);
+       font-family:var(--sans);line-height:1.6;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  header.hero{border:1px solid var(--line);border-radius:18px;padding:32px 34px;
+       background:radial-gradient(120% 140% at 0% 0%,rgba(139,92,246,.18),transparent 55%),var(--panel)}
+  .eyebrow{font:600 12px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--purple)}
+  h1{margin:.5rem 0 .3rem;font-size:34px;letter-spacing:-.02em}
+  .sub{color:var(--mut);font-size:16px;max-width:70ch}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .badge{font:600 12px/1 var(--mono);padding:7px 11px;border-radius:999px;border:1px solid var(--line);
+         background:var(--panel2);color:var(--mut)}
+  .badge b{color:var(--ink)}
+  .badge.ok{border-color:rgba(52,211,153,.4);color:var(--green)}
+  .badge.acc{border-color:rgba(139,92,246,.5);color:#c4b5fd}
+
+  h2{font-size:13px;font-family:var(--mono);letter-spacing:.16em;text-transform:uppercase;
+     color:var(--mut);margin:46px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+
+  /* horizontal pipeline */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .node{flex:1 1 0;min-width:135px;background:var(--panel);border:1px solid var(--line);
+        border-radius:12px;padding:14px 14px 13px;position:relative}
+  .node .k{font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+  .node .t{font-weight:700;margin:7px 0 4px;font-size:14.5px}
+  .node .d{font-size:12.5px;color:var(--mut)}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--purple);
+         font-size:22px;padding:0 6px;flex:0 0 auto}
+  .dot{position:absolute;top:12px;right:12px;width:9px;height:9px;border-radius:50%}
+  .dot.g{background:var(--green)} .dot.a{background:var(--amber)} .dot.b{background:var(--blue)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 2px 0;font-size:12.5px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .pill{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+  /* stage cards */
+  .stage{display:grid;grid-template-columns:42px 1fr;gap:16px;border:1px solid var(--line);
+         border-radius:14px;background:var(--panel);padding:18px 20px;margin:12px 0}
+  .num{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font:800 17px/1 var(--mono);
+       background:linear-gradient(135deg,var(--purple),var(--purple-dim));color:#fff}
+  .stage h3{margin:2px 0 4px;font-size:17px}
+  .stage .role{font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+  .role.g{color:var(--green)} .role.a{color:var(--amber)} .role.b{color:var(--blue)}
+  .stage p{margin:8px 0;color:#cdd2dc;font-size:14px}
+  code,kbd{font-family:var(--mono);font-size:12.5px}
+  .cmd{display:block;background:#0a0c12;border:1px solid var(--line);border-left:3px solid var(--purple);
+       border-radius:8px;padding:10px 12px;margin:8px 0 2px;color:#d7defb;overflow-x:auto;white-space:pre}
+  .cmd .c{color:#6b7385}
+  .tag{display:inline-block;font:600 11px/1 var(--mono);padding:4px 8px;border-radius:6px;
+       background:var(--panel2);border:1px solid var(--line);color:var(--mut);margin:2px 4px 2px 0}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:18px 20px}
+  .card h4{margin:0 0 6px;font-size:15px}
+  .card.moat{border-color:rgba(139,92,246,.45)}
+  .card .lab{font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--purple)}
+  ul{margin:8px 0;padding-left:18px} li{margin:4px 0;color:#cdd2dc;font-size:13.5px}
+
+  .note{border:1px solid rgba(251,191,36,.4);background:rgba(251,191,36,.07);border-radius:12px;
+        padding:16px 18px;margin:14px 0}
+  .note b{color:var(--amber)}
+  .ok-note{border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.07);border-radius:12px;padding:16px 18px;margin:14px 0}
+  .ok-note b{color:var(--green)}
+
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+  td .s{font-family:var(--mono);color:var(--cyan)}
+  .foot{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);color:var(--mut);font-size:13px}
+  a{color:#c4b5fd}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}.flow{flex-direction:column}.arrow{transform:rotate(90deg);padding:4px 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">claude-obsidian · v1.10 “Graphbuilding Fusion”</div>
+    <h1>Your paper → graph workflow, right now</h1>
+    <p class="sub">How a research PDF becomes a queryable claim graph in this vault — what is automated and native today, what is still manual, and the exact command for every step.</p>
+    <div class="badges">
+      <span class="badge acc">📄 <b>98</b> papers</span>
+      <span class="badge acc">🔷 <b>1,444</b> entities</span>
+      <span class="badge acc">💬 <b>1,052</b> claims</span>
+      <span class="badge acc">🕳️ <b>899</b> gaps</span>
+      <span class="badge ok">✓ migration verified lossless</span>
+    </div>
+  </header>
+
+  <!-- PIPELINE AT A GLANCE -->
+  <h2>The pipeline at a glance</h2>
+  <div class="flow">
+    <div class="node"><span class="dot b"></span><div class="k">Source</div><div class="t">Research PDF</div><div class="d">a paper you want to add</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="dot a"></span><div class="k">Extract</div><div class="t">paper-scholar</div><div class="d">PDF → structured knowledge</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="dot a"></span><div class="k">Ingest</div><div class="t">→ markdown</div><div class="d">claims + entities + paper</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="dot g"></span><div class="k">Truth</div><div class="t">wiki/graph/</div><div class="d">markdown, git-tracked</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="dot g"></span><div class="k">Build</div><div class="t">graph-build</div><div class="d">→ derived sqlite</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="dot g"></span><div class="k">Analyze</div><div class="t">gaps · resolve</div><div class="d">5 species · dedup</div></div>
+  </div>
+  <div class="legend">
+    <span><i class="pill" style="background:var(--green)"></i> native &amp; automated in this repo</span>
+    <span><i class="pill" style="background:var(--amber)"></i> works, but not yet one-command native</span>
+    <span><i class="pill" style="background:var(--blue)"></i> your input / external</span>
+  </div>
+
+  <!-- STAGE BY STAGE -->
+  <h2>Stage by stage</h2>
+
+  <div class="stage">
+    <div class="num">1</div>
+    <div>
+      <div class="role b">Your input · external skill</div>
+      <h3>Extract the paper</h3>
+      <p>A research PDF is turned into structured knowledge (title, sections, concepts, relationships) by the <b>paper-scholar</b> / <b>paper-master</b> skills. These live outside claude-obsidian — they are the front door that produces clean, machine-readable paper content.</p>
+      <span class="tag">/paper-scholar extract paper.pdf</span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="num">2</div>
+    <div>
+      <div class="role a">Semi-automated today · native automation is the next step</div>
+      <h3>Ingest into the claim graph</h3>
+      <p>Extracted papers become the graph's atoms: <b>entities</b> (typed: Concept / Method / Artifact / Task / Measure / Source) and <b>claims</b> — typed <code>subject —predicate→ object</code> triples carrying <b>polarity</b> (asserts/refutes), <b>strength</b>, and a <b>support</b> count, each anchored to a verbatim quote.</p>
+      <p>Today there are two real ways new papers land as markdown under <code>wiki/graph/</code>:</p>
+      <ul>
+        <li><b>Hand-author</b> a <code>papers/</code>, <code>entities/</code>, <code>claims/</code> markdown file set following the contract in <code>wiki/graph/SCHEMA.md</code>, then run the build.</li>
+        <li><b>Bulk import</b> from an existing sqlite graph via <code>graph-export.py</code> — this is how the current 98-paper corpus got here.</li>
+      </ul>
+      <span class="tag">SCHEMA.md = the frontmatter contract</span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="num">3</div>
+    <div>
+      <div class="role g">Native · the source of truth</div>
+      <h3>wiki/graph/ — plain markdown you own</h3>
+      <p>This directory <b>is the truth</b>. Git-tracked, Obsidian-readable, hand-fixable. If the extractor was noisy, you edit the markdown — the quote and triple are right there to judge.</p>
+      <p><code>papers/&lt;slug&gt;.md</code> · <code>entities/&lt;name&gt;__e&lt;id&gt;.md</code> · <code>claims/c&lt;id&gt;.md</code> · <code>_graph/</code> aux tables · <code>graph-export.json</code> portable snapshot.</p>
+      <div class="ok-note"><b>Kept separate on purpose:</b> <code>wiki/graph/entities/</code> (structured, typed) is distinct from <code>wiki/entities/</code> (prose pages). Merging them would flatten the claim layer back into a plain organizer — the one thing this design exists to prevent.</div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="num">4</div>
+    <div>
+      <div class="role g">Native · automated</div>
+      <h3>Build the derived index</h3>
+      <p>The markdown is compiled into a <b>throwaway</b> sqlite index. It is gitignored and can be deleted any time — it is rebuilt from the markdown, never the other way around. Entity rollups use one shared, cycle-safe <code>root()</code> helper (never the old single-hop <code>COALESCE</code>).</p>
+      <code class="cmd">uv run python scripts/graph-build.py wiki/graph .vault-meta/graph/graph.db
+<span class="c"># → papers 98 · entities 1444 · claims 1052 · aliases 834 …</span></code>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="num">5</div>
+    <div>
+      <div class="role g">Native · automated</div>
+      <h3>Analyze — gaps &amp; duplicate resolution</h3>
+      <p>Over the derived index you run the analytics the page wiki could never do:</p>
+      <ul>
+        <li><b>Gap scan</b> — five species: <b>frontier</b>, <b>debate</b> (asserts vs refutes on one triple), <b>replication</b> (single-support results to confirm), <b>coverage</b> (thin entities), <b>white-space</b> (disconnected community pairs).</li>
+        <li><b>Entity resolution</b> — proposes duplicate merges (exact-name, then embedding / token-Jaccard similarity). Proposes only; you confirm.</li>
+      </ul>
+      <code class="cmd">uv run python scripts/graph-gaps.py --top 20        <span class="c"># research gaps</span>
+uv run python scripts/graph-resolve.py --json       <span class="c"># merge proposals</span></code>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="num">6</div>
+    <div>
+      <div class="role g">Native · the compounding loop</div>
+      <h3>Edit → rebuild → re-analyze</h3>
+      <p>Fix a wrong claim or merge two entities in the markdown, rebuild, and the gap counts update. Because truth is markdown in git, every correction is durable and versioned — the graph compounds instead of decaying.</p>
+      <span class="tag">edit wiki/graph/*.md</span><span class="tag">→ graph-build</span><span class="tag">→ graph-gaps</span>
+    </div>
+  </div>
+
+  <!-- HONEST STATUS -->
+  <h2>What's automated vs. what isn't (the honest version)</h2>
+  <table>
+    <tr><th>Stage</th><th>Tool</th><th>Status</th></tr>
+    <tr><td>Extract paper from PDF</td><td class="s">paper-scholar / paper-master</td><td>external skill ✔</td></tr>
+    <tr><td>Ingest new paper → graph markdown</td><td class="s">graph-ingest.py</td><td style="color:var(--amber)">not built yet — manual via SCHEMA.md or bulk export</td></tr>
+    <tr><td>Markdown = source of truth</td><td class="s">wiki/graph/</td><td style="color:var(--green)">native ✔</td></tr>
+    <tr><td>Build derived index</td><td class="s">graph-build.py</td><td style="color:var(--green)">native ✔</td></tr>
+    <tr><td>Gap scan (5 species)</td><td class="s">graph-gaps.py</td><td style="color:var(--green)">native ✔</td></tr>
+    <tr><td>Entity dedup</td><td class="s">graph-resolve.py</td><td style="color:var(--green)">native ✔</td></tr>
+    <tr><td>Bulk import from sqlite</td><td class="s">graph-export.py</td><td style="color:var(--green)">native ✔</td></tr>
+  </table>
+  <div class="note"><b>The one gap in the loop:</b> getting a <i>brand-new</i> paper into the graph is not yet a single command — <code>graph-ingest.py</code> is specified in <code>SCHEMA.md</code> but not implemented. Until it exists, new papers enter by hand-authoring markdown to the contract, or by bulk-importing an existing sqlite graph. <b>Everything from “markdown” onward is fully automated and verified.</b></div>
+
+  <!-- THE TWO HALVES -->
+  <h2>Why a claim graph and not just pages</h2>
+  <div class="grid2">
+    <div class="card moat">
+      <div class="lab">The moat · claim layer</div>
+      <h4>wiki/graph/ — claims</h4>
+      <p style="color:#cdd2dc;font-size:13.5px">A typed, signed, quoted proposition is the atom. Only this can answer “Paper A asserts X, Paper B refutes X”, count replications, and surface the five gap species.</p>
+      <ul><li>subject —predicate→ object</li><li>polarity · strength · support</li><li>verbatim quote = provenance wall</li></ul>
+    </div>
+    <div class="card">
+      <div class="lab">The organizer · page layer</div>
+      <h4>wiki/ — prose pages</h4>
+      <p style="color:#cdd2dc;font-size:13.5px">The existing /wiki family: readable pages, links, hybrid retrieval, methodology modes. Excellent at recall and narrative — but it cannot represent contested claims.</p>
+      <ul><li>pages, wikilinks, hot/index cache</li><li>BM25 + rerank retrieval</li><li>LYT / PARA / Zettelkasten modes</li></ul>
+    </div>
+  </div>
+
+  <!-- QUICK REF -->
+  <h2>Command quick reference</h2>
+  <code class="cmd"><span class="c"># rebuild the index from markdown (safe any time; the db is disposable)</span>
+uv run python scripts/graph-build.py wiki/graph .vault-meta/graph/graph.db
+
+<span class="c"># scan for research gaps (human report, or JSON)</span>
+uv run python scripts/graph-gaps.py --top 20
+uv run python scripts/graph-gaps.py --json --top 50
+
+<span class="c"># propose duplicate-entity merges (you confirm each)</span>
+uv run python scripts/graph-resolve.py --json
+
+<span class="c"># bulk-import an existing sqlite graph into wiki/graph/ markdown</span>
+uv run python scripts/graph-export.py &lt;source.db&gt; wiki/graph
+
+<span class="c"># run the test suite (39 tests)</span>
+make test-graph</code>
+
+  <div class="foot">
+    Source of truth: <code>wiki/graph/</code> · Derived index: <code>.vault-meta/graph/graph.db</code> (gitignored)<br>
+    Design: <a href="graphbuilding-fusion-design.md">graphbuilding-fusion-design.md</a> ·
+    Verification: <a href="graphbuilding-fusion-migration-report.md">graphbuilding-fusion-migration-report.md</a> ·
+    Contract: <a href="../wiki/graph/SCHEMA.md">wiki/graph/SCHEMA.md</a>
+  </div>
+
+</div>
+</body>
+</html>

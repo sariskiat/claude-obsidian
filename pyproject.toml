@@ -1,0 +1,18 @@
+[project]
+name = "claude-obsidian"
+version = "1.9.2"
+requires-python = ">=3.12"
+dependencies = [
+    "PyYAML>=6.0",
+    "networkx>=3.3",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+]

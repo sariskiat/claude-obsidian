@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spec: Graphbuilding Fusion — Phase 1: Markdown-Vault Migration Round-Trip</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --ink:#e6e8eb; --muted:#9aa3af; --line:#2a2f3a;
+    --accent:#6ea8fe; --green:#4ade80; --amber:#fbbf24; --purple:#c084fc;
+    --code-bg:#1d212a; --th:#1f2530; --red:#f87171;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1060px;margin:0 auto;padding:48px 32px 120px;}
+  h1{font-size:1.8rem;line-height:1.25;margin:0 0 .4rem;}
+  h2{font-size:1.3rem;margin:3rem 0 .6rem;padding-bottom:.3rem;border-bottom:1px solid var(--line);}
+  h3{font-size:1.04rem;margin:1.8rem 0 .5rem;color:var(--accent);}
+  p,li{margin:.6rem 0;}
+  a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+  code{background:var(--code-bg);padding:.1em .38em;border-radius:4px;
+    font:.86em/1.5 "SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#d6deeb;}
+  blockquote{margin:1rem 0;padding:.6rem 1rem;border-left:3px solid var(--accent);
+    background:var(--panel);color:var(--muted);border-radius:0 6px 6px 0;}
+  .meta{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;
+    margin:1rem 0 1.4rem;display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;font-size:.92rem;}
+  .meta dt{color:var(--muted);}.meta dd{margin:0;}
+  .badge{display:inline-block;padding:.12em .6em;border-radius:999px;font-size:.8rem;font-weight:600;
+    background:rgba(251,191,36,.15);color:var(--amber);border:1px solid rgba(251,191,36,.35);}
+  .badge.ok{background:rgba(74,222,128,.15);color:var(--green);border-color:rgba(74,222,128,.4);}
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.86rem;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--th);font-weight:600;color:#cdd5e0;}
+  tr:last-child td{border-bottom:none;}
+  ul,ol{margin:.5rem 0 .8rem 1.3rem;padding:0;}
+  hr{border:none;border-top:1px solid var(--line);margin:2rem 0;}
+
+  figure{margin:1.6rem 0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 22px 14px;}
+  figcaption{color:var(--muted);font-size:.84rem;text-align:center;margin-top:.8rem;
+    padding:.8rem 12px 0;line-height:1.5;border-top:1px solid var(--line);}
+
+  /* ── diagram system ── */
+  .box{border-radius:10px;padding:14px 16px;font-size:.875rem;line-height:1.6;}
+  .box p,.box li{margin:.4rem 0;}
+  .box-title{font-size:.93rem;font-weight:700;margin:0 0 8px;line-height:1.3;}
+  .t-r{color:var(--red);}.t-b{color:var(--accent);}.t-g{color:var(--green);}
+  .t-p{color:var(--purple);}.t-y{color:var(--amber);}.t-m{color:var(--muted);}
+  .c-r{color:var(--red);}.c-b{color:var(--accent);}.c-g{color:var(--green);}
+  .c-p{color:var(--purple);}.c-y{color:var(--amber);}.c-m{color:var(--muted);}
+  .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.84em;color:#d6deeb;}
+  .small{font-size:.875rem;}.xs{font-size:.8rem;}
+
+  .box-r{background:rgba(248,113,113,.06);border:1.5px solid rgba(248,113,113,.4);}
+  .box-b{background:rgba(110,168,254,.06);border:1.5px solid rgba(110,168,254,.4);}
+  .box-g{background:rgba(74,222,128,.06);border:2px solid rgba(74,222,128,.45);}
+  .box-p{background:rgba(192,132,252,.05);border:1.5px solid rgba(192,132,252,.35);}
+  .box-y{background:rgba(251,191,36,.05);border:1.5px solid rgba(251,191,36,.38);}
+  .box-d{background:var(--code-bg);border:1px solid var(--line);}
+  .box-d-r{background:var(--code-bg);border:1.5px solid rgba(248,113,113,.5);}
+  .box-d-b{background:var(--code-bg);border:1.5px solid rgba(110,168,254,.5);}
+  .box-dashed-r{background:rgba(248,113,113,.03);border:1.5px dashed rgba(248,113,113,.3);}
+  .box-hi-g{background:rgba(74,222,128,.1);border:2.2px solid rgba(74,222,128,.6);}
+
+  .row-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  .row-3{display:grid;grid-template-columns:1fr 32px 1fr 32px 1fr;align-items:start;gap:4px;}
+  .arr{display:flex;align-items:center;justify-content:center;font-size:1.3rem;align-self:center;}
+  .arr-down{text-align:center;padding:8px 0;font-size:1.25rem;color:var(--accent);}
+  .arr-label{font-size:.82rem;text-align:center;color:var(--accent);font-weight:600;margin:-2px 0 10px;}
+
+  .pipeline{display:flex;align-items:stretch;gap:0;}
+  .pip{flex:1;min-width:0;border-radius:10px;padding:12px 14px;font-size:.82rem;line-height:1.55;}
+  .pip p{margin:.3rem 0;}
+  .pip-arr{display:flex;align-items:center;padding:0 8px;font-size:1.2rem;flex-shrink:0;align-self:center;}
+
+  .banner{border-radius:10px;padding:14px 18px;margin-top:12px;font-size:.875rem;line-height:1.6;}
+  .banner p{margin:.3rem 0;}
+  .banner-g{background:rgba(74,222,128,.06);border:2px solid rgba(74,222,128,.5);}
+  .banner-r{background:rgba(248,113,113,.04);border:1.5px dashed rgba(248,113,113,.3);}
+  .banner-p{background:rgba(192,132,252,.04);border:1px solid rgba(192,132,252,.3);}
+
+  .zone-outer{border-radius:12px;padding:16px;background:rgba(248,113,113,.02);border:1.4px dashed rgba(248,113,113,.28);}
+  .zone-title{font-size:.88rem;font-weight:700;margin:0 0 10px;}
+  .zone-inner{border-radius:12px;padding:16px;background:rgba(74,222,128,.06);border:2px solid rgba(74,222,128,.5);margin-top:12px;}
+
+  .d-label{text-align:center;font-size:.82rem;color:var(--muted);margin:0 0 10px;}
+  .d-label b{color:var(--ink);}
+  .d-sep{border:none;border-top:1px solid var(--line);margin:10px 0;}
+
+  .ac-grid-top{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .ac-grid-bot{display:grid;grid-template-columns:1fr 1fr 2fr;gap:10px;margin-top:10px;}
+
+  pre.cb{background:var(--code-bg);border:1px solid var(--line);border-radius:6px;
+    padding:10px 14px;margin:8px 0;
+    font:.82rem/1.65 "SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    color:#d6deeb;overflow-x:auto;white-space:pre;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Spec: Graphbuilding Fusion — Phase 1<br>Markdown-Vault Migration Round-Trip</h1>
+
+<dl class="meta">
+  <dt>Feature ID</dt><dd><code>graph-vault-migration</code></dd>
+  <dt>Status</dt><dd><span class="badge ok">approved</span></dd>
+  <dt>Grilled on</dt><dd>2026-06-06</dd>
+  <dt>Approved by</dt><dd><code>saris (human) · 2026-06-06</code></dd>
+  <dt>Classification</dt><dd><code>unique</code></dd>
+</dl>
+
+<blockquote>
+  <p>Epic: <a href="../docs/graphbuilding-fusion-design.md">docs/graphbuilding-fusion-design.md</a>.
+  This spec covers <strong>Phase 1 only</strong> — the smallest provable slice of the fusion.
+  Research: <code>~/Desktop/research/graph-skill-debt.md</code>, <code>graph-skill-redesign.md</code>.</p>
+</blockquote>
+
+<!-- ═══ 1 ═══ -->
+<h2>1. What this slice changes — the problem, objective, and metric</h2>
+<figure>
+<p class="d-label"><span class="c-r" style="font-weight:700">PROBLEM</span> &nbsp;→&nbsp; <span class="c-b" style="font-weight:700">OBJECTIVE</span> &nbsp;→&nbsp; <span class="c-g" style="font-weight:700">METRIC</span></p>
+<div class="row-3">
+  <div class="box box-r">
+    <div class="box-title t-r">PROBLEM</div>
+    <p class="small">The claim graph lives only as a sqlite db in a scattered dotdir (<span class="mono">~/.graphbuilding/graph.db</span>).</p>
+    <p class="small">It is <strong>not hand-editable</strong>, <strong>not git-tracked</strong>, and reading it <strong>forces repair + full recompute</strong> because the write path never guaranteed the read invariants (103 dangling, 134 chains, 13 self-loops, 8 orphans in one live session).</p>
+  </div>
+  <div class="arr c-r">→</div>
+  <div class="box box-b">
+    <div class="box-title t-b">OBJECTIVE</div>
+    <p class="small">Establish a <span class="c-g"><strong>structured markdown vault</strong></span> as the <strong>source of truth</strong> for the claim graph.</p>
+    <p class="small">Sqlite becomes a <span class="c-y"><strong>derived, rebuildable, throwaway index</strong></span>. Markdown is git-tracked and hand-editable. The index is rebuilt from it losslessly.</p>
+  </div>
+  <div class="arr c-b">→</div>
+  <div class="box box-g">
+    <div class="box-title t-g">METRIC (Phase 1)</div>
+    <p class="small"><strong>Round-trip fidelity</strong> — binary pass/fail:</p>
+    <p class="small">✓ <strong>9/9 tables byte-equivalent</strong><br>✓ <strong>5/5 gap species exact</strong></p>
+    <p class="small c-m">Baseline today: 5/5 species + 6/7 counts (alias bug). Target: 9/9 tables + 5/5 species.</p>
+  </div>
+</div>
+<p class="d-label" style="margin-top:16px"><b>The two halves being fused — neither discarded</b></p>
+<div class="row-2">
+  <div class="box box-p">
+    <div class="box-title t-p">From graphbuilding — keep (the moat)</div>
+    <p class="small">claim = typed signed proposition (never merged) · 6 entity super-types · typed predicates with domain/range enforced · 5 gap species (frontier / debate / replication / coverage / white-space) · polarity (asserts/refutes) · support count · two provenance walls · canonical entity resolution</p>
+  </div>
+  <div class="box box-b">
+    <div class="box-title t-b">From this repo — reuse (the engineering)</div>
+    <p class="small">markdown SoT + git · per-file advisory locking · BM25 + embedding retrieval pipeline · hot.md / index.md tiered cache · transport fallback (cli→mcp→filesystem) · verifier agent · pytest harness · methodology modes · plugin packaging</p>
+  </div>
+</div>
+<figcaption>The three-sentence spec. Phase 1 adds the green middle layer: markdown as SoT, sqlite as derived index, proven lossless by a round-trip test run against a copy of the live db.</figcaption>
+</figure>
+
+<!-- ═══ 2 ═══ -->
+<h2>2. Architecture — the vault is the source of truth</h2>
+<figure>
+<div class="box box-g">
+  <div class="box-title t-g">wiki/graph/ — SOURCE OF TRUTH — git-tracked, hand-editable, Obsidian-readable</div>
+  <p class="small"><code>papers/</code> 98 .md files — frontmatter: title, authors, sections with summaries<br>
+  <code>entities/</code> 1444 .md files — frontmatter: typed identity, canonical pointer, merge_confidence, aliases &nbsp;|&nbsp; body: description<br>
+  <code>claims/</code> 1052 .md files — frontmatter: the queryable triple + polarity + support + provenance &nbsp;|&nbsp; body: statement + verbatim quote callout<br>
+  <code>_graph/</code> predicates.md, entity_edges.md, citation_links.md (auxiliary tables) &nbsp;|&nbsp; <code>SCHEMA.md</code> (the frontmatter contract) &nbsp;|&nbsp; <code>graph-export.json</code> (full machine snapshot, committed)</p>
+</div>
+<div class="arr-down">↓</div>
+<div class="arr-label"><span class="c-b"><strong>graph-build.py</strong> — reads YAML frontmatter from every file → inserts with explicit ids → runs root() self-heal → reports integrity</span></div>
+<div style="max-width:680px;margin:0 auto">
+  <div class="box box-y">
+    <div class="box-title t-y">.vault-meta/graph/graph.db — DERIVED — gitignored — throwaway</div>
+    <p class="small">Ids preserved on import → Louvain (seed=42) partitions on the same node labels → white-space gaps identical across rebuilds. Delete it any time; rebuild on demand.</p>
+  </div>
+</div>
+<div class="arr-down">↓</div>
+<div class="arr-label"><span class="c-b"><strong>graph-gaps.py / graph-resolve.py / graph-bridge.py</strong> — the analytics engine (reference in Phase 1, native rebuild in Phase 2)</span></div>
+<div style="max-width:680px;margin:0 auto">
+  <div class="box box-d" style="text-align:center">
+    <p class="small"><span class="c-g"><strong>5 gap species</strong></span> (frontier · debate · replication · coverage · white-space) &nbsp;|&nbsp; <strong>support rollup</strong> &nbsp;|&nbsp; <strong>Louvain communities</strong></p>
+    <p class="small c-m">The questions no page-level organizer (Obsidian, Graphify, wiki-ingest) can represent, let alone answer.</p>
+  </div>
+</div>
+<div class="banner banner-p" style="margin-top:12px">
+  <p class="small"><span class="c-p"><strong>Is this a migration?</strong></span> Yes — a one-time data migration AND a permanent architecture change. Today the claim graph lives only in sqlite. After Phase 1 the markdown vault becomes the source of truth forever.</p>
+  <p class="small">The <strong>round-trip test</strong> is how we prove the migration is <strong>lossless</strong>: export all 98 papers / 1444 entities / 1052 claims to markdown → rebuild sqlite from that markdown → compare the two dbs byte-for-byte. If they match, nothing was lost. That proof is the whole point of Phase 1.</p>
+  <p class="small c-m">After Phase 1, the direction reverses: <em>markdown is authored first</em>, sqlite is rebuilt from it. The one-time export → import proves the seam before any new writing happens.</p>
+</div>
+<figcaption>Markdown is the source of truth from Phase 1 onward. The round-trip test (export existing db → import back → compare) proves the migration from sqlite-only to markdown-first is fully lossless before any hand-editing begins.</figcaption>
+</figure>
+
+<!-- ═══ 3 ═══ -->
+<h2>3. The frontmatter contract — the authority split</h2>
+<figure>
+<div class="row-2">
+  <div class="box box-d-r">
+    <div class="box-title t-r">entities/attention-mechanism__e17.md</div>
+    <hr class="d-sep">
+    <p class="xs c-m">─── YAML FRONTMATTER (queryable) ───</p>
+<pre class="cb">type: entity
+id: 17
+name: "Attention Mechanism"
+super_type: Concept
+sub_type: "neural-network-component"
+is_canonical: true
+canonical_id: null
+merge_confidence: 0.95
+source_paper: vaswani2017
+aliases:
+  - "self-attention"
+  - "Scaled Dot-Product Attn"</pre>
+    <p class="xs c-m">─── BODY (readable only) ───</p>
+    <p class="small">A mechanism that allows each position in a sequence to attend to all positions. Core building block of the Transformer architecture.</p>
+  </div>
+  <div class="box box-d-b">
+    <div class="box-title t-b">claims/c42.md</div>
+    <hr class="d-sep">
+    <p class="xs c-m">─── YAML FRONTMATTER (queryable) ───</p>
+<pre class="cb">type: claim
+id: 42
+subject_id: 17   # entity AS extracted, never rolled up
+predicate: part-of
+object_id: 3
+claim_type: definition
+polarity: asserts
+strength: strong
+support: 3       # papers asserting same ⟨s,p,o⟩
+status: confirmed
+source_paper: vaswani2017
+section_id: 88
+generated_by: claude-opus-4-8@v1</pre>
+    <p class="xs c-m">─── BODY (readable evidence) ───</p>
+    <p class="small">Attention is a core building block of the Transformer architecture.</p>
+    <p class="small"><code>&gt; [!quote]</code><br><span class="c-m">"We propose a new simple network architecture, the Transformer, based solely on attention mechanisms..."</span></p>
+  </div>
+</div>
+<div class="banner banner-g" style="text-align:center">
+  <p><strong><span class="c-g">FRONTMATTER = QUERYABLE</span></strong> — these fields power the five gap species. The importer reads this.</p>
+  <p><strong>BODY = READABLE</strong> — statement, verbatim quote callout, equations, worked examples. Importer parses the statement + quote markers only.</p>
+</div>
+<div class="row-2" style="margin-top:12px">
+  <div class="box box-d">
+    <p><span class="c-b"><strong>&gt; [!quote]</strong></span></p>
+    <p class="small">The provenance wall. Exact excerpt from the paper. If the quote isn't in the source, the claim is <span class="c-r"><strong>falsifiably wrong</strong></span>. Importer parses this block.</p>
+  </div>
+  <div class="box box-d">
+    <p><span class="c-b"><strong>$$...$$ equations &amp; worked examples</strong></span></p>
+    <p class="small">Go in the body, readable only. To make a relation queryable, promote it into the frontmatter schema and update <code>graph-build.py</code> to parse it.</p>
+  </div>
+</div>
+<div class="banner banner-r" style="text-align:center">
+  <p><span class="c-r"><strong>⚠ This is NOT the same as wiki/entities/ prose pages.</strong></span></p>
+  <p class="small">The existing <code>wiki/entities/</code> are editorial-prose pages. These are structured-claim entities. Different model. Prose drift = losing the gap-finding.</p>
+</div>
+<figcaption>Two record types. Every field the gap species depend on lives in the YAML frontmatter. The body holds human-readable evidence. The <code>&gt; [!quote]</code> callout is the provenance wall — the only body field the importer structurally parses beyond the statement text.</figcaption>
+</figure>
+
+<!-- ═══ 4 ═══ -->
+<h2>4. The round-trip pipeline — proof that the vault is lossless</h2>
+<figure>
+<div class="pipeline">
+  <div class="pip box-r">
+    <div class="box-title t-r">① COPY</div>
+    <p>live graph.db → copy.db</p>
+    <p class="xs c-m">temp file. never mutates live source (BR4).</p>
+  </div>
+  <div class="pip-arr c-b">→</div>
+  <div class="pip box-b">
+    <div class="box-title t-b">② EXPORT</div>
+    <p>copy.db → wiki/graph/</p>
+    <p class="xs c-m">writes all .md + graph-export.json. ids preserved in frontmatter.</p>
+  </div>
+  <div class="pip-arr c-g">→</div>
+  <div class="pip box-g">
+    <div class="box-title t-g">③ BUILD</div>
+    <p>vault → rebuilt.db</p>
+    <p class="xs c-m">reads frontmatter, inserts with preserved ids. root() self-heals.</p>
+  </div>
+  <div class="pip-arr c-p">→</div>
+  <div class="pip box-p">
+    <div class="box-title t-p">④ COMPARE</div>
+    <p>copy.db vs rebuilt.db</p>
+    <p class="xs c-m">per-table row counts. per-row diff for all 9 tables.</p>
+  </div>
+  <div class="pip-arr c-g">→</div>
+  <div class="pip box-hi-g" style="text-align:center">
+    <div class="box-title t-g">⑤ PASS</div>
+    <p><strong>9/9 tables<br>5/5 species</strong></p>
+  </div>
+</div>
+<div class="banner banner-r" style="text-align:center">
+  <p><span class="c-r"><strong>⚡ The live ~/.graphbuilding/graph.db is NEVER mutated.</strong></span></p>
+  <p class="small">Export always operates on a COPY (BR4). The test copies the live db → exports → builds → diffs → discards everything in a temp directory.</p>
+</div>
+<figcaption>Five deterministic stages. Every ID (entity, claim, section) is preserved verbatim across export→build — without that, Louvain partitions shift and white-space gaps drift (BR1).</figcaption>
+</figure>
+
+<!-- ═══ 5 ═══ -->
+<h2>5. The root() helper — the single rollup function</h2>
+<figure>
+<div class="banner banner-r" style="margin-bottom:14px">
+  <p class="small"><strong>Every current script</strong> does <code>COALESCE(canonical_id, id)</code> — that is <strong><span class="c-r">single-hop and wrong</span></strong> on chains. <span class="c-g"><strong>root()</strong></span> follows the full chain, path-compresses, and survives every edge case. It is the fix for the 134-chain / 13-loop / 103-dangling drift discovered in the live graph.</p>
+</div>
+<div class="row-3">
+  <div class="box box-d">
+    <div class="box-title t-b">CASE 1 — CHAIN</div>
+    <p class="small">Three entities: <strong>A→B→C</strong></p>
+    <p class="small"><strong>In the db:</strong></p>
+<pre class="cb">A.id=1, canonical_id→2 (B)
+B.id=2, canonical_id→3 (C)
+C.id=3, canonical_id=NULL</pre>
+    <p class="small c-r"><strong>Single-hop COALESCE:</strong><br>A→B → stops at B — WRONG. B is not canonical.</p>
+    <p class="small c-g"><strong>root():</strong><br>A→B→C → root = C ✓<br>Path-compresses: rewrites A→C, B→C so chains never walked twice.</p>
+  </div>
+  <div class="arr"></div>
+  <div class="box box-d">
+    <div class="box-title t-y">CASE 2 — CYCLE / SELF-LOOP</div>
+    <p class="small">A canonical→B, B canonical→A. Or A→A.</p>
+    <p class="small"><strong>In the db:</strong></p>
+<pre class="cb">A.id=1, canonical_id→2 (B)
+B.id=2, canonical_id→1 (A)</pre>
+    <p class="small">Naïvely following canonical would <strong>spin forever</strong>.</p>
+    <p class="small c-g"><strong>root():</strong><br>Tracks visited set. When B is already seen:<br>→ elects <strong>min({A,B})</strong> = A as root<br>→ path-compresses B→A<br>→ refuses the cycle — never loops.</p>
+  </div>
+  <div class="arr"></div>
+  <div class="box box-d">
+    <div class="box-title t-r">CASE 3 — DANGLING</div>
+    <p class="small">A points to a parent row that was deleted.</p>
+    <p class="small"><strong>In the db:</strong></p>
+<pre class="cb">A.id=1, canonical_id→999
+— NO row with id=999 exists —</pre>
+    <p class="small">This is the exact bug that <strong>crashed validate.py check 6</strong> — 103 danglers found in the live graph.</p>
+    <p class="small c-g"><strong>root():</strong><br>Checks: parent exists? No → stops.<br>→ Returns the <strong>last live id (A)</strong> as root.<br>→ Does NOT crash. Does NOT throw.<br>→ Reports the dangling pointer.</p>
+  </div>
+</div>
+<div class="banner banner-g" style="text-align:center">
+  <div class="box-title t-g" style="font-size:1rem;margin-bottom:6px">root(conn, entity_id, compress=True)</div>
+  <p class="small">Always returns a live entity id · Always terminates · Path-compresses on read (union-find) · Cycle-safe · Dangling-safe · Replaces every inline <code>COALESCE(canonical_id, id)</code> in every hub/gap/community/validate query.</p>
+</div>
+<div class="banner banner-p" style="margin-top:10px">
+  <p class="small"><span class="c-p"><strong>BR2 · redesign Change 2:</strong></span> root() follows the chain to the NULL root, path-compressing; refuses cycles/self-loops; survives dangling. This kills the chain-miscount bug at the source.</p>
+  <p class="small"><span class="c-p"><strong>BR3 · redesign Change 3:</strong></span> graph-build.py calls root() on every entity on import → self-heals any drift found, reports it, never crashes. Drift can no longer accumulate because every rebuild cleans it.</p>
+</div>
+<figcaption>The one function that fixes the integrity drift diagnosed in <code>graph-skill-debt.md</code>. Every current script reimplements single-hop COALESCE — that shortcut IS the miscount bug. <code>root()</code> replaces all of them with one correct, shared helper.</figcaption>
+</figure>
+
+<!-- ═══ 6 ═══ -->
+<h2>6. Why entity / claim / section ids must be preserved (BR1)</h2>
+<figure>
+<div class="row-2">
+  <div class="box box-g">
+    <div class="box-title t-g">IDs PRESERVED on import — correct</div>
+    <p class="small">Entity id=10, id=17, id=42, id=88 → same ids in rebuilt db.</p>
+    <p class="small"><span class="c-g"><strong>Louvain(seed=42)</strong></span> is a deterministic algorithm, but the <strong>partition depends on node labels</strong> (entity ids). Same ids → same partition → <span class="c-g"><strong>white-space gaps identical: 312 ✓</strong></span></p>
+    <p class="small">Claim ids and section ids also preserved → per-row diff possible → no silent data-loss bugs can hide.</p>
+  </div>
+  <div class="box box-dashed-r">
+    <div class="box-title t-r">IDs RENUMBERED on import — broken</div>
+    <p class="small">Auto-increment reassigns: 10→1, 17→2, 42→3, 88→4.</p>
+    <p class="small"><span class="c-r"><strong>Louvain</strong></span> re-partitions on different labels → <span class="c-r"><strong>white-space count drifts randomly</strong></span> and the round-trip cannot be exact. No per-row diff possible → silent data-loss bugs hide behind matching species counts.</p>
+    <p class="small c-m">networkx Louvain communities is seed=42 deterministic but not label-invariant — changing the id set reshuffles the partition.</p>
+  </div>
+</div>
+<figcaption>Louvain(<code>seed=42</code>) is deterministic but the partition depends on node labels (entity ids). Preserving ids (BR1) keeps the white-space species stable across rebuilds.</figcaption>
+</figure>
+
+<!-- ═══ 7 ═══ -->
+<h2>7. The alias bug — AC3, the one thing broken today</h2>
+<figure>
+<div class="row-2">
+  <div class="box box-r">
+    <div class="box-title t-r">BEFORE (broken) — 834 aliases exported, only 779 survive import</div>
+    <p class="small"><strong>Root cause:</strong> the alias table has a <code>UNIQUE</code> constraint on the alias column. During import, <code>INSERT OR IGNORE</code> is used — but SQLite's default collation for <code>UNIQUE</code> is case-insensitive (BINARY on the column, but the import was normalizing case).</p>
+    <p class="small">So <code>"vit"</code> (lowercase, entity e30) and <code>"ViT-HD"</code> (mixed-case, entity e42) collide on <code>"vit"</code> after normalization → the second insert is silently dropped. This lost <strong>55 aliases</strong> out of 834.</p>
+    <p class="small c-r"><strong>This is a round-trip bug:</strong> the export had all 834, the import silently lost 55.</p>
+  </div>
+  <div class="box box-g">
+    <div class="box-title t-g">AFTER (fixed) — all 834 aliases survive import</div>
+    <p class="small"><strong>Fix:</strong> preserve exact alias strings from the vault frontmatter on import — <strong>no normalization, no case-folding, no silent dedup</strong>. The vault IS the truth — if two aliases differ only by case, they are two distinct surface forms and both should be preserved.</p>
+    <p class="small">The round-trip already has the exact aliases in the vault's frontmatter (the export writes faithfully). The import must read them back verbatim.</p>
+    <p class="small"><span class="c-g"><strong>Verification:</strong></span> AC1 per-row diff shows <code>aliases</code> count <code>834 = 834</code> ✓</p>
+  </div>
+</div>
+<figcaption>AC3. 55 silently-dropped aliases. Root cause: over-eager case normalisation during import. Fix: exact-string preservation from frontmatter — the vault is authoritative.</figcaption>
+</figure>
+
+<!-- ═══ 8 ═══ -->
+<h2>8. The change surface — what Phase 1 touches and does not touch</h2>
+<figure>
+<div class="zone-outer">
+  <div class="zone-title c-r">EXISTING REPO — READ-ONLY · CANNOT MODIFY</div>
+  <div style="display:flex;gap:16px;align-items:start;">
+    <div style="flex:1;font-size:.85rem;line-height:1.65;">
+      <p><code>skills/wiki-*</code> (15 skills: wiki, wiki-ingest, wiki-query, wiki-lint, wiki-cli, wiki-retrieve, wiki-mode, wiki-fold, autoresearch, save, canvas, think, obsidian-bases, obsidian-markdown, defuddle) &nbsp;|&nbsp; <code>scripts/retrieve.py</code>, <code>bm25-index.py</code>, <code>rerank.py</code>, <code>contextual-prefix.py</code>, <code>wiki-mode.py</code>, <code>wiki-lock.sh</code>, <code>detect-transport.sh</code></p>
+      <p><code>wiki/entities/</code> prose pages &nbsp;|&nbsp; <code>_templates/</code>, <code>agents/verifier.md</code>, <code>hooks/</code>, <code>bin/</code>, <code>docs/</code>, <code>assets/</code>, <code>commands/</code>, <code>.obsidian/</code>, <code>.claude-plugin/</code>, <code>.vault-meta/</code> (existing entries: transport.json, mode.json, chunks/, bm25/, locks/)</p>
+      <p><code>plugin.json</code> (version bump deferred to Phase 5) &nbsp;|&nbsp; <code>CLAUDE.md</code>, <code>README.md</code>, <code>CHANGELOG.md</code>, <code>LICENSE</code>, <code>Makefile</code></p>
+    </div>
+    <div class="box box-dashed-r" style="flex-shrink:0;max-width:220px;font-size:.82rem;text-align:center">
+      <span class="c-r"><strong>~/.graphbuilding/graph.db</strong></span><br>
+      <span class="xs c-m">COPY only — never written</span>
+    </div>
+  </div>
+  <div class="zone-inner">
+    <div class="zone-title c-g">NEW FILES — CAN CREATE · CAN MODIFY · THIS IS THE BLAST RADIUS</div>
+    <p style="font-size:.85rem"><code>scripts/graph-db.py</code> &nbsp;|&nbsp; <code>scripts/graph-export.py</code> &nbsp;|&nbsp; <code>scripts/graph-build.py</code> &nbsp;|&nbsp; <code>tests/test_graph_roundtrip.py</code></p>
+    <p style="font-size:.85rem"><code>wiki/graph/SCHEMA.md</code> &nbsp;|&nbsp; <code>wiki/graph/{papers,entities,claims,_graph}/</code> (export target dirs, empty until export runs) &nbsp;|&nbsp; <code>wiki/graph/graph-export.json</code> (committed snapshot)</p>
+    <p style="font-size:.85rem"><code>.gitignore</code> (add <code>.vault-meta/graph/graph.db</code> entry) &nbsp;|&nbsp; <code>pyproject.toml</code> (add PyYAML dependency)</p>
+  </div>
+</div>
+<figcaption>Everything new (green) vs everything read-only (red). The live sqlite db is outside the repo — copied for the test, never written to.</figcaption>
+</figure>
+
+<!-- ═══ 9 ═══ -->
+<h2>9. Acceptance criteria — seven automated + one design check</h2>
+<figure>
+<p class="d-label"><b>All seven automated ACs must pass + AC8 documented → <span class="c-g">Evaluator verdict: PASS</span></b></p>
+<div class="ac-grid-top">
+  <div class="box box-d" style="border-color:rgba(74,222,128,.4)">
+    <div class="box-title t-g">AC1</div>
+    <p class="small">9 tables byte-equal</p>
+    <p class="xs c-m">test_table_counts_match + per-row diff</p>
+  </div>
+  <div class="box box-d" style="border-color:rgba(74,222,128,.4)">
+    <div class="box-title t-g">AC2</div>
+    <p class="small">5 gap species exact</p>
+    <p class="xs c-m">test_gap_species_match (65/0/473/49/312)</p>
+  </div>
+  <div class="box box-d" style="border-color:rgba(74,222,128,.4)">
+    <div class="box-title t-g">AC3</div>
+    <p class="small">alias bug fixed</p>
+    <p class="xs c-m">aliases 834→834, part of AC1 diff</p>
+  </div>
+  <div class="box box-d" style="border-color:rgba(74,222,128,.4)">
+    <div class="box-title t-g">AC4</div>
+    <p class="small">root() handles all cases</p>
+    <p class="xs c-m">test_root_invariants (chain/cycle/dangling)</p>
+  </div>
+</div>
+<div class="ac-grid-bot">
+  <div class="box box-d" style="border-color:rgba(74,222,128,.4)">
+    <div class="box-title t-g">AC5</div>
+    <p class="small">source db untouched</p>
+    <p class="xs c-m">test_source_untouched (hash before==after)</p>
+  </div>
+  <div class="box box-d" style="border-color:rgba(74,222,128,.4)">
+    <div class="box-title t-g">AC6</div>
+    <p class="small">gitignore correct</p>
+    <p class="xs c-m">git check-ignore: db ignored, json tracked</p>
+  </div>
+  <div class="box box-hi-g">
+    <div class="box-title t-g">AC7</div>
+    <p class="small">full suite green in this repo's pytest harness</p>
+    <p class="xs"><code>uv run python -m pytest tests/test_graph_roundtrip.py -q</code> <span class="c-m">→ 7/7 PASS</span></p>
+  </div>
+</div>
+<div class="banner" style="background:rgba(74,222,128,.04);border:1px solid rgba(74,222,128,.3);text-align:center;margin-top:10px">
+  <p class="small"><strong>Metric:</strong> round-trip fidelity, binary — 9/9 tables + 5/5 species = <span class="c-g">PASS</span> &nbsp;|&nbsp; baseline 6/7 tables + 5/5 species → target 9/9 + 5/5</p>
+</div>
+
+<!-- AC8: NEW INGESTION FORWARD PATH -->
+<div style="margin-top:16px;border:1.5px solid rgba(110,168,254,.5);border-radius:10px;padding:16px 18px;background:rgba(110,168,254,.04)">
+  <div class="box-title t-b" style="font-size:.95rem;margin-bottom:10px">AC8 — New paper ingestion: the forward path is documented and does not conflict with Phase 1</div>
+  <p class="small">Phase 1 proves the round-trip for <em>existing</em> data. But once the markdown vault is the source of truth, <strong>every new paper must enter via the vault</strong>, not via direct sqlite writes. This AC documents the forward path so Phase 4 (skills/graph/*) has a clear contract to implement.</p>
+
+  <p class="small c-b" style="margin-top:12px;font-weight:600">The new ingestion flow (target state after Phase 4):</p>
+  <div class="pipeline" style="margin:10px 0">
+    <div class="pip box-d">
+      <div class="box-title t-m">① SOURCE</div>
+      <p>Drop PDF/text into <code>.raw/</code></p>
+      <p class="xs c-m">same entry point as today's wiki-ingest</p>
+    </div>
+    <div class="pip-arr c-b">→</div>
+    <div class="pip box-d">
+      <div class="box-title t-m">② WIKI INGEST</div>
+      <p><code>wiki-ingest</code> (unchanged)</p>
+      <p class="xs c-m">writes prose page to <code>wiki/entities/</code> as today. no change.</p>
+    </div>
+    <div class="pip-arr c-b">→</div>
+    <div class="pip box-b">
+      <div class="box-title t-b">③ GRAPH INGEST <span class="xs c-m">(Phase 4)</span></div>
+      <p><code>graph-ingest.py</code> extracts typed claims</p>
+      <p class="xs c-m">writes new <code>.md</code> files directly into <code>wiki/graph/</code>:</p>
+      <p class="xs c-m"><code>papers/&lt;slug&gt;.md</code><br><code>entities/&lt;name&gt;__e&lt;id&gt;.md</code><br><code>claims/c&lt;id&gt;.md</code></p>
+    </div>
+    <div class="pip-arr c-g">→</div>
+    <div class="pip box-g">
+      <div class="box-title t-g">④ REBUILD</div>
+      <p><code>graph-build.py</code> runs</p>
+      <p class="xs c-m">reads all frontmatter → rebuilds derived db with new paper's data. ids preserved. root() heals any new drift.</p>
+    </div>
+    <div class="pip-arr c-g">→</div>
+    <div class="pip box-hi-g" style="text-align:center">
+      <div class="box-title t-g">⑤ GAPS</div>
+      <p><strong>gaps update</strong></p>
+      <p class="xs c-m">new paper's claims appear in gap species. new frontier/debate/replication gaps surface.</p>
+    </div>
+  </div>
+
+  <div class="row-2" style="margin-top:12px">
+    <div class="box box-d" style="font-size:.82rem">
+      <div class="box-title t-g" style="font-size:.87rem">What Phase 1 guarantees for Phase 4</div>
+      <ul style="font-size:.82rem;margin:.4rem 0 0 1rem;padding:0">
+        <li>The frontmatter contract (<code>SCHEMA.md</code>) is the stable interface graph-ingest must write to</li>
+        <li>Ids are assigned by graph-ingest and stored verbatim — new entities get the next available id</li>
+        <li>Claims point to <code>subject_id</code>/<code>object_id</code> as extracted — never rolled up at write time</li>
+        <li><code>graph-build.py</code> is idempotent — safe to run after every ingest</li>
+      </ul>
+    </div>
+    <div class="box box-d" style="font-size:.82rem">
+      <div class="box-title t-r" style="font-size:.87rem">What is NOT in Phase 1 scope (forward path)</div>
+      <ul style="font-size:.82rem;margin:.4rem 0 0 1rem;padding:0">
+        <li><code>graph-ingest.py</code> is not implemented — that is Phase 4</li>
+        <li>No skill surface (<code>skills/graph/*</code>) in Phase 1</li>
+        <li>No git automation for new vault commits in Phase 1</li>
+        <li>New papers still enter via legacy graphbuilding skill until Phase 4</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="small c-m" style="margin-top:10px"><strong>Verification (Phase 1):</strong> the SCHEMA.md written by graph-export.py fully documents the frontmatter contract a future graph-ingest.py must follow. A manual smoke test confirms a hand-authored <code>wiki/graph/papers/test.md</code> + entity + claim round-trips cleanly through graph-build.py → gaps. This is a documented design constraint, not an automated Phase 1 test.</p>
+</div>
+
+<figcaption>AC1–AC5 = data contract. AC6 = git policy. AC7 = integrated gate. AC8 = forward ingestion contract documented. The metric is binary — all seven automated checks pass, plus AC8 design documentation is complete, or the slice is not done.</figcaption>
+</figure>
+
+<!-- ═══ REFERENCE TABLES ═══ -->
+<h2>10. Supporting reference</h2>
+
+<h3>Functional requirements</h3>
+<table>
+  <thead><tr><th>ID</th><th>Requirement</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>FR1</td><td><code>wiki/graph/SCHEMA.md</code> defines the frontmatter contract</td><td>authority split: frontmatter = queryable, body = readable</td></tr>
+    <tr><td>FR2</td><td><code>scripts/graph-db.py</code>: <code>connect()</code> (FK on), <code>root()</code>, typed inserts</td><td>single shared rollup; no inline COALESCE anywhere</td></tr>
+    <tr><td>FR3</td><td><code>scripts/graph-export.py</code> dumps db → vault + JSON snapshot</td><td>runs on COPY; ids preserved in frontmatter</td></tr>
+    <tr><td>FR4</td><td><code>scripts/graph-build.py</code> rebuilds derived db from vault</td><td>ids preserved; root() self-heals; reports integrity</td></tr>
+    <tr><td>FR5</td><td><code>tests/test_graph_roundtrip.py</code> proves AC1–AC7</td><td>pytest, in this repo's harness</td></tr>
+    <tr><td>FR6</td><td>Fix alias round-trip bug (834→834)</td><td>exact-string preservation on import</td></tr>
+    <tr><td>FR7</td><td>Derived db gitignored; graph-export.json tracked</td><td>derived is throwaway</td></tr>
+    <tr><td>FR8</td><td><code>wiki/graph/</code> paths fixed, never routed through <code>wiki-mode.py</code></td><td>claim layer is mode-independent</td></tr>
+  </tbody>
+</table>
+
+<h3>Business rules</h3>
+<table>
+  <thead><tr><th>Rule</th><th>Statement</th><th>Source / Verification</th></tr></thead>
+  <tbody>
+    <tr><td>BR1</td><td>Ids preserved verbatim on rebuild — Louvain partitions on node labels</td><td>white-space count identical across round-trip</td></tr>
+    <tr><td>BR2</td><td><code>root()</code>: full chain, path-compress, cycle-safe, dangling-safe</td><td>redesign Change 2; unit tests on synthetic fixtures</td></tr>
+    <tr><td>BR3</td><td><code>graph-build.py</code>: self-heal, report, never crash</td><td>redesign Change 3; drift-injected vault → report + exit 0</td></tr>
+    <tr><td>BR4</td><td>Export only on a COPY; live db never mutated</td><td>live hash/mtime unchanged after test run</td></tr>
+    <tr><td>BR5</td><td>Claims never roll up — raw entity ids in <code>subject_id</code>/<code>object_id</code></td><td>frontmatter preserves extracted ids</td></tr>
+  </tbody>
+</table>
+
+<h3>Errors and edge cases</h3>
+<table>
+  <thead><tr><th>Scenario</th><th>Expected behavior</th></tr></thead>
+  <tbody>
+    <tr><td>Live graph clean (current state: 0 drift)</td><td>root() no-op; round-trip exact; build still self-heals</td></tr>
+    <tr><td>Drift present (chains/loops/dangling/orphans)</td><td>root() compresses + reports; never crashes; orphans surfaced</td></tr>
+    <tr><td>citation_links empty (0 rows today)</td><td>export/import empty table cleanly</td></tr>
+    <tr><td>Duplicate section headings per paper (2 papers affected)</td><td>section referenced by preserved id, not heading text</td></tr>
+    <tr><td>Live db missing at test time</td><td>test skips with clear skip message</td></tr>
+  </tbody>
+</table>
+
+<h2>11. Out of scope &amp; open questions</h2>
+<ul>
+  <li><strong>Phase 2:</strong> native <code>graph-gaps.py</code> (5 species reimplementation) · migrate real live graph into committed markdown</li>
+  <li><strong>Phase 3:</strong> entity resolution + embedding dedup reusing <code>rerank.py</code> · degrade gracefully when ollama absent</li>
+  <li><strong>Phase 4:</strong> <code>wiki-lock</code> / retrieval / <code>verifier</code> integrity / <code>hot.md</code> graph cache · <code>skills/graph/*</code> user surface</li>
+  <li><strong>Phase 5:</strong> git-lfs/PDF consolidation · <code>plugin.json</code> bump · CHANGELOG</li>
+  <li><strong>Deferred indefinitely:</strong> merging prose <code>wiki/entities/</code> with structured <code>wiki/graph/entities/</code></li>
+</ul>
+
+<div class="banner banner-p" style="margin-top:14px">
+  <p class="small"><span class="c-p"><strong>Deferred design idea — "give the extractor / graph the full document":</strong></span> decomposed into three, only one of which we keep.</p>
+  <p class="small"><span class="c-g"><strong>✓ P4 — full-document context for extraction.</strong></span> <code>graph-ingest.py</code> sees the whole paper (full coreference/context) when extracting claims, not chunks. This is an extractor-<em>input</em> quality knob — it does NOT store the document in the graph, does NOT touch the Phase 1 schema or round-trip.</p>
+  <p class="small"><span class="c-g"><strong>✓ P3 — hybrid query spike (claim → source expansion).</strong></span> Join the two layers at <em>query</em> time, not storage time: <code>question → claim hit → follow section_id → pull surrounding passage from prose/.raw → rerank</code>. Keys already exist (claims carry <code>section_id</code> + <code>source_paper</code>; <code>papers/*.md</code> hold sections). A/B claim-only vs claim+expanded-section.</p>
+  <p class="small"><span class="c-r"><strong>✗ Rejected — storing full document text inside <code>wiki/graph/</code>.</strong></span> Dilutes the moat (gaps run on triples, not prose) · duplicates the existing prose + <code>retrieve.py</code> layer (the "become the organizer" trap) · wrecks the byte-equal round-trip. The provenance-wall quote is already the correct, surgical amount of source text in the graph.</p>
+</div>
+
+<hr>
+<p style="font-size:.85rem;color:var(--muted)">
+  <code>specs/graph-vault-migration.md</code> is canonical · this is its diagram-first rendering<br>
+  Status <span class="badge ok">approved</span> · 2026-06-06 · 10 HTML/CSS diagrams · AC8 forward path added
+</p>
+
+</div>
+</body>
+</html>

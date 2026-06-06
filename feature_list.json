@@ -967,8 +967,8 @@
     },
     "graph-bridge": {
       "title": "Proposal Finder — graph-bridge.py (ranked, grounded white-space bridge proposals)",
-      "status": "in_progress",
-      "phase": "plan",
+      "status": "completed",
+      "phase": "passing",
       "problem_statement": "The graph can name white-space gaps (community pairs with zero claim-edges) but cannot turn them into ranked, justified next-paper proposals, so the analysis stops short of the research output it exists to serve.",
       "jtbd": "When I see white-space in my claim graph, I want a ranked shortlist of justified bridge proposals grounded in the real papers, so I can pick my next paper's contribution instead of eyeballing 116 gaps.",
       "problem_classification": "unique",
@@ -1024,57 +1024,73 @@
           "id": "AC1",
           "criterion": "Ranks white-space gaps into proposals with a per-proposal signal breakdown; deterministic (seed=42), repeat runs identical.",
           "verification": "uv run python -m pytest tests/test_graph_bridge.py -k rank_deterministic -q 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_bridge.py -k rank_deterministic -q 2>&1 | grep -qE 'failed|error' )",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "rank_deterministic 3 passed; live md5 identical across 3 runs (f688ff67...)"
+          ]
         },
         {
           "id": "AC2",
           "criterion": "Every proposal cites only entities/papers present in the graph (no fabrication); only zero-claim-edge pairs (BR1).",
           "verification": "uv run python -m pytest tests/test_graph_bridge.py -k grounding_integrity -q 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_bridge.py -k grounding_integrity -q 2>&1 | grep -qE 'failed|error' )",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "grounding_integrity 3 passed; independent BR1 check 0/100 cross-claim-edge violations on live db"
+          ]
         },
         {
           "id": "AC3",
           "criterion": "Gold anchor: a VTON-containing community <-> a diffusion-sampling/distillation-containing community bridge appears in the top-N, identified by entity membership (not a hardcoded community number).",
           "verification": "uv run python -m pytest tests/test_graph_bridge.py -k gold_anchor_vton_aek -q 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_bridge.py -k gold_anchor_vton_aek -q 2>&1 | grep -qE 'failed|error' )",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "gold_anchor_vton_aek 2 passed; live gold anchor (VTON<->diffusion/distillation) ranks #1 score=0.7057 dr=1.0"
+          ]
         },
         {
           "id": "AC4",
           "criterion": "Default run does zero network egress; --synthesize is the only egress path, gated through contextual-prefix.pick_prefix_tier (BR4).",
           "verification": "uv run python -m pytest tests/test_graph_bridge.py -k no_egress_default -q 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_bridge.py -k no_egress_default -q 2>&1 | grep -qE 'failed|error' )",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "no_egress_default 2 passed; 0/100 non-null justifications on default path; sabotaged-claude shim never fired (empirical zero-egress)"
+          ]
         },
         {
           "id": "AC5",
           "criterion": "Graceful degradation: missing db -> non-zero exit + build hint; no white-space gaps -> empty list + exit 0; --synthesize without claude on PATH -> structured fallback + exit 0.",
           "verification": "uv run python -m pytest tests/test_graph_bridge.py -k degrade -q 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_bridge.py -k degrade -q 2>&1 | grep -qE 'failed|error' )",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "degrade 3 passed; missing-db exit 1 + build hint verified independently; --synthesize falls back exit 0"
+          ]
         },
         {
           "id": "AC6",
           "criterion": "JSON schema valid (id, community_a, community_b, anchor_entities, anchor_papers, score, signal_breakdown, passages, optional justification) + markdown report renders; --top honored.",
           "verification": "uv run python -m pytest tests/test_graph_bridge.py -k schema -q 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_bridge.py -k schema -q 2>&1 | grep -qE 'failed|error' )",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "schema 6 passed; --top honored; markdown report renders gold anchor at #1"
+          ]
         },
         {
           "id": "AC7",
           "criterion": "No regression: make test-graph (44 passed / 4 skipped) + make test-fulltext (44 passed) stay green.",
           "verification": "make test-graph 2>&1 | grep -qE '44 passed' && make test-fulltext 2>&1 | grep -qE '44 passed'",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "make test-graph 44 passed/4 skipped; make test-fulltext 44 passed (baseline held exactly)"
+          ]
         },
         {
           "id": "AC8",
           "criterion": "/graph bridge wired: commands/graph.md and skills/graph/SKILL.md both reference the bridge subcommand/script.",
           "verification": "grep -q 'graph-bridge' commands/graph.md && grep -q 'graph-bridge' skills/graph/SKILL.md",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "graph-bridge referenced in commands/graph.md (3x) + skills/graph/SKILL.md (op-6 section)"
+          ]
         }
       ],
       "tasks": [
@@ -1082,7 +1098,7 @@
           "id": "T1",
           "title": "RED: write tests/test_graph_bridge.py with a tiny self-built fixture db (mirrors test_graph_gaps style) covering AC1-AC6 plus a 100-case stress harness; all failing because graph-bridge.py absent.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "tests/test_graph_bridge.py"
           ],
@@ -1104,7 +1120,7 @@
           "id": "T2",
           "title": "GREEN core: graph-bridge.py builds the SAME seed=42 Louvain clustering as graph-gaps white-space (lossless reuse of the substrate, no edit to graph-gaps.py), enumerates zero-claim-edge community pairs (BR1), ranks by transparent weighted heuristic with per-proposal signal_breakdown (gap_confidence, bridgeability via entity_edges shared-neighbors, limitation_pull, richness, direction_relevance). Weights documented + CLI-tunable (FR2). Satisfies AC1, AC2.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-bridge.py"
           ],
@@ -1128,7 +1144,7 @@
           "id": "T3",
           "title": "GREEN direction_relevance + gold anchor: direction_relevance signal boosts pairs touching priority areas (virtual-try-on AND diffusion-sampling/noise-optimization/distillation) by entity-name membership so the VTON<->Aek bridge surfaces in top-N. Satisfies AC3.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-bridge.py",
             "tests/test_graph_bridge.py"
@@ -1151,7 +1167,7 @@
           "id": "T4",
           "title": "GREEN grounding + output: anchor entities (most-connected per side via entity_edges), anchor papers (papers contributing those entities/claims), top passages per side via graph-retrieve.py (degrades to 'no full text' note when a community has no indexed paper). JSON + markdown report; --top honored (default 10); FR7 light dedup flags already_proposed=true when endpoints match a hand-written bridge entity (e.g. 'Extrapolation-Based Iterate Correction', id 1958) rather than dropping it. Satisfies AC6.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-bridge.py",
             "tests/test_graph_bridge.py"
@@ -1176,7 +1192,7 @@
           "id": "T5",
           "title": "GREEN egress + degrade: --synthesize off by default (zero egress) gated through contextual-prefix.pick_prefix_tier(force_synthetic, allow_egress); default returns 'synthetic'; --synthesize without claude on PATH falls back to structured justification + exit 0. Missing db -> non-zero + build hint; no gaps -> empty + exit 0; --top > candidate count -> return all. Satisfies AC4, AC5.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-bridge.py",
             "tests/test_graph_bridge.py"
@@ -1201,7 +1217,7 @@
           "id": "T6",
           "title": "Wire /graph bridge: add bridge subcommand to commands/graph.md and routing to skills/graph/SKILL.md; optional test-bridge target in Makefile; optional bridge note in wiki/graph/SCHEMA.md. Satisfies AC8.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "commands/graph.md",
             "skills/graph/SKILL.md",
@@ -1228,7 +1244,7 @@
           "id": "T7",
           "title": "VALIDATE: full regression (make test-graph 44/4 + make test-fulltext 44 stay green), live `/graph bridge` report showing the gold anchor + signal breakdown, 100-case stress scorecard >=95% well-formed+grounded, idempotent re-run (run twice on real db, diff empty). Satisfies AC7 + metric.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [],
           "depends_on": [
             "T6"
@@ -1245,13 +1261,20 @@
         }
       ],
       "validation": {
-        "user_acceptance": "pending",
-        "business_metric": "pending"
+        "user_acceptance": "pending_human",
+        "business_metric": "met: gold anchor (VTON<->diffusion/distillation) ranks #1 on live db (score 0.7057, dr 1.0); 100-case stress 100% well-formed+grounded+non-degenerate; deterministic ranking (md5 identical x3); FR7 flags 8 already_proposed without dropping. Awaits human ratification (autonomous pre-authorized draft)."
       },
       "learning": {
-        "technical": [],
-        "product": [],
-        "process": [],
+        "technical": [
+          "graph-bridge reconstructs the seed=42 Louvain clustering identically to graph-gaps (canonical nodes via graph_db.root, weighted claim edges) rather than recomputing differently — verified the live gold anchor ranks #1, which only holds if the substrate matches.",
+          "Ranking determinism (BR2) is byte-identical across runs; --synthesize output is NOT deterministic because it shells out to live `claude -p` (claude-cli tier) — that is intended opt-in egress per FR5, not an AC, so non-identical synthesize md5 is correct behavior."
+        ],
+        "product": [
+          "FR7 flags-not-drops: 8 of top-100 carry already_proposed=true (endpoints touch a hand-written bridge entity) and remain ranked — the user still sees them, which is the point."
+        ],
+        "process": [
+          "Evaluator proved zero-egress on the default path empirically by placing a failing `claude` shim first on PATH and confirming it never fired — stronger evidence than reading the args.synthesize guard. Code-reading alone would have missed that `claude` IS present in this env (so the egress tier is reachable) yet correctly gated."
+        ],
         "harness_updates": []
       }
     }

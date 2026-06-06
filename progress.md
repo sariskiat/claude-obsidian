@@ -54,3 +54,24 @@
 - FIX 2 (board): AC2/AC3/AC4/AC9 verification strings in feature_list.json updated from underscore -k filters (skip_bodyless, retrieve_provenance, no_egress_default, read_surface — collected 0 tests, exit 5) to CamelCase class names (SkipBodyless, RetrieveProvenance, NoEgressDefault, ReadSurface). Each verified to exit 0 and collect tests.
 - Verification: tests/test_graph_fulltext.py 44 passed (was 40, +4 new); make test-graph 44/4 unchanged.
 - Files: scripts/graph-retrieve.py, tests/test_graph_fulltext.py, feature_list.json, progress.md.
+
+## graph-bridge (P5) — Evaluator cycle (2026-06-07)
+
+**Verdict: PASS** (git note `grade: pass` on 1bc8363). Local only — nothing pushed.
+
+Real-execution evidence (all 8 ACs run as OS processes):
+- AC1-AC6 bridge suite: 26 passed (rank_deterministic 3, grounding_integrity 3, gold_anchor 2, no_egress_default 2, degrade 3, schema 6, plus wiring/invariants/stress).
+- AC7 regression: `make test-graph` 44 passed/4 skipped; `make test-fulltext` 44 passed — baseline held exactly.
+- AC8 wiring: `graph-bridge` in commands/graph.md + skills/graph/SKILL.md.
+
+Independent verification (not via pytest):
+- Gold anchor (VTON ↔ diffusion-sampling/distillation) ranks **#1** on the live db (score 0.7057, direction_relevance 1.0).
+- Determinism: 3 live runs byte-identical (md5 f688ff67…).
+- BR1: 0/100 proposals have cross-community claim edges (true white-space).
+- BR4/zero-egress: 0/100 non-null justifications on the default path; a sabotaged `claude` shim placed first on PATH never fired → empirical proof the default path does not egress.
+- BR5: no COALESCE, no oracle import, `graph_db.root()` only. Scope clean — no read-only files touched.
+- FR7: 8 proposals flagged `already_proposed` and kept (not dropped).
+
+Note: `claude` is present in this env, so `--synthesize` selects the claude-cli tier (intended opt-in egress per FR5); its narrative output is live-LLM and non-deterministic — expected, not an AC.
+
+**Awaits human ratification** (autonomous pre-authorized draft). Board: graph-bridge → passing/completed; validation.user_acceptance = pending_human.

@@ -236,19 +236,32 @@ stop re-mining on every read.
 
 ## 8. The alias bug (AC3 — the one thing broken today)
 
-```
-  BEFORE (broken):  834 exported  →  779 imported   (55 silently lost)
-  ─────────────────────────────────────────────────────────────────
-   "vit"      ─┐   INSERT OR IGNORE + case-normalization
-   "ViT-HD"   ─┴─▶ collide on "vit"  →  2nd row dropped  ✗
-                   (alias column UNIQUE; import folded case)
+> **Root cause (empirically verified against the live db, NOT a case-fold collision).**
+> `distinct lower(alias) == 834 == total` → there are **zero** case collisions. The 55 lost
+> aliases are exactly the 55 rows whose `canonical_id` points at a **deleted/missing entity**
+> (dangling FK). Export drops them while grouping aliases by `canonical_id` (no live entity to
+> attach to), and the derived `aliases` table enforces `REFERENCES entities(id)`, so they could
+> not be re-inserted under FK-on even if exported. 55 dangling rows = the 55 lost. Exact match.
 
-  AFTER (fixed):    834 exported  →  834 imported   ✓
-  ─────────────────────────────────────────────────────────────────
-   preserve the EXACT alias string from frontmatter on import
-   no normalize · no case-fold · no silent dedup · the vault IS truth
+```
+  BEFORE (broken):  834 in live db  →  779 in rebuilt   (the 55 DANGLING-FK rows lost)
+  ──────────────────────────────────────────────────────────────────────────────────
+   aliases table:  alias UNIQUE,  canonical_id NOT NULL REFERENCES entities(id)
+
+   55 rows:  alias="…",  canonical_id → (entity id 411–424, 940+ … NO SUCH ROW)
+        │
+        ├─ export: groups aliases by canonical_id → no live entity → row never written ✗
+        └─ build : even if written, FK REFERENCES entities(id) rejects the insert ✗
+
+  AFTER (fixed):    834 in live db  →  834 in rebuilt   ✓
+  ──────────────────────────────────────────────────────────────────────────────────
+   • export writes ALL 834 alias rows verbatim, including the 55 with a dangling
+     canonical_id (carry the id as-is; the vault is the truth, dangling and all)
+   • derived aliases table does NOT enforce the entities(id) FK → dangling rows re-insert
+   • no normalize · no case-fold · no silent dedup · no FK rejection
    verify: AC1 per-row diff shows aliases 834 = 834  ✓
 ```
+
 
 ---
 
@@ -267,7 +280,7 @@ stop re-mining on every read.
  │   │  scripts/graph-build.py     tests/test_graph_roundtrip.py             │  │
  │   │  wiki/graph/SCHEMA.md       wiki/graph/{papers,entities,claims,_graph}/│  │
  │   │  wiki/graph/graph-export.json (committed)                             │  │
- │   │  .gitignore (+1 entry)      pyproject.toml (+ PyYAML dep)             │  │
+ │   │  .gitignore (+1 entry)      pyproject.toml (+PyYAML +networkx deps)   │  │
  │   └────────────────────────────────────────────────────────────────────────┘  │
  └──────────────────────────────────────────────────────────────────────────────┘
 
@@ -357,6 +370,7 @@ instead of an opaque dotdir db.
 | `wiki/graph/**.md` | W export / R build | bad frontmatter → build raises with path |
 | `wiki/graph/graph-export.json` | W | committed snapshot |
 | PyYAML | dep | declared; `uv` install |
+| networkx | dep (REQUIRED) | white-space species needs Louvain; absent → species collapses 312→1 (AC2 silently wrong) |
 
 | Edge case | Expected |
 |---|---|
@@ -407,3 +421,30 @@ git-lfs/PDF consolidation & `plugin.json` bump (P5) · unifying prose `wiki/enti
 - Tech lead approved: ✅ 2026-06-06 (saris)
 - Critic reviewed testability: ✅ binary round-trip + AC8 forward-path documented
 - Metric validated against user value: ✅ lossless, hand-editable, git-tracked claim graph
+
+---
+
+## 16. Persisted Task Breakdown (Planner — Phase 1)
+
+Recon-verified facts (2026-06-06, branch `feature/graph-vault-migration`):
+- Live DB `~/.graphbuilding/graph.db` exists (1.75MB). Counts confirmed: papers 98, sections 789,
+  paper_authors 97, entities 1444 (755 canonical, `canonical_id IS NULL`), predicates 46,
+  claims 1052 (64 `proposed`), entity_edges 543, citation_links 0, **aliases 834**.
+- **AC3 root cause (verified):** 55 of the 834 alias rows have a `canonical_id` pointing at a
+  non-existent entity id (dangling FK; ids 411-424, 940+, …). The oracle `graph_export.py` groups
+  aliases by `canonical_id` and only emits ones attaching to a live entity → 779 reach frontmatter →
+  779 imported. Fix = preserve ALL 834 alias rows verbatim through export AND import (dangling
+  included). The derived `aliases` table must NOT enforce the `REFERENCES entities(id)` FK on these
+  rows, else re-insert is rejected under `PRAGMA foreign_keys = ON`.
+- **AC2 gap species (verified):** with `networkx` present the 5 species are exactly
+  frontier 65 / debate 0 / replication 473 / coverage 49 / white-space 312 (total 899), identical
+  src vs rebuilt. WITHOUT networkx the Louvain white-space path hits a fallback (white-space→1,
+  total 588). **`networkx` is therefore a required dependency** in `pyproject.toml`, not optional.
+- **AC5 (verified):** the oracle `gaps.py` and `export()` do NOT mutate their source db (md5 stable).
+  The native scripts must keep this property; the test runs on a temp copy.
+- Native script filenames are hyphenated (`graph-db.py`) → not importable as modules. The test loads
+  them via `importlib.util.spec_from_file_location` or drives them by subprocess CLI.
+- Missing today: `pyproject.toml`, `wiki/graph/`, all `scripts/graph-*.py`, `tests/test_graph_roundtrip.py`.
+- Oracle (reference only, do NOT copy): `~/.claude/skills/graphbuilding/scripts/{db_helpers,graph_export,graph_import,init_db,gaps}.py`.
+
+See `feature_list.json` for the machine-readable task graph and runnable verification per AC.

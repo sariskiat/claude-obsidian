@@ -369,19 +369,19 @@ B.id=2, canonical_id→1 (A)</pre>
 <figure>
 <div class="row-2">
   <div class="box box-r">
-    <div class="box-title t-r">BEFORE (broken) — 834 aliases exported, only 779 survive import</div>
-    <p class="small"><strong>Root cause:</strong> the alias table has a <code>UNIQUE</code> constraint on the alias column. During import, <code>INSERT OR IGNORE</code> is used — but SQLite's default collation for <code>UNIQUE</code> is case-insensitive (BINARY on the column, but the import was normalizing case).</p>
-    <p class="small">So <code>"vit"</code> (lowercase, entity e30) and <code>"ViT-HD"</code> (mixed-case, entity e42) collide on <code>"vit"</code> after normalization → the second insert is silently dropped. This lost <strong>55 aliases</strong> out of 834.</p>
-    <p class="small c-r"><strong>This is a round-trip bug:</strong> the export had all 834, the import silently lost 55.</p>
+    <div class="box-title t-r">BEFORE (broken) — 834 in live db, only 779 survive rebuild</div>
+    <p class="small"><strong>Root cause (verified against the live db — NOT a case-fold collision):</strong> <code>distinct lower(alias) == 834 == total</code>, so there are <strong>zero</strong> case collisions. The 55 lost rows are exactly the 55 whose <code>canonical_id</code> points at a <strong>deleted/missing entity</strong> (dangling FK — ids 411–424, 940+).</p>
+    <p class="small">Two compounding failures: (1) <strong>export</strong> groups aliases by <code>canonical_id</code> — a dangling pointer has no live entity to attach to, so the row is never written; (2) the derived <code>aliases</code> table enforces <code>canonical_id NOT NULL REFERENCES entities(id)</code>, so even if written, <strong>build</strong> rejects the insert under FK-on. 55 dangling = 55 lost. Exact match.</p>
+    <p class="small c-r"><strong>This is a round-trip bug:</strong> the live db holds all 834, the rebuild silently loses the 55 dangling-FK rows.</p>
   </div>
   <div class="box box-g">
-    <div class="box-title t-g">AFTER (fixed) — all 834 aliases survive import</div>
-    <p class="small"><strong>Fix:</strong> preserve exact alias strings from the vault frontmatter on import — <strong>no normalization, no case-folding, no silent dedup</strong>. The vault IS the truth — if two aliases differ only by case, they are two distinct surface forms and both should be preserved.</p>
-    <p class="small">The round-trip already has the exact aliases in the vault's frontmatter (the export writes faithfully). The import must read them back verbatim.</p>
+    <div class="box-title t-g">AFTER (fixed) — all 834 aliases survive the rebuild</div>
+    <p class="small"><strong>Fix:</strong> <strong>export writes all 834 rows verbatim</strong>, including the 55 with a dangling <code>canonical_id</code> (carry the id as-is — the vault is the truth, dangling and all).</p>
+    <p class="small">The derived <code>aliases</code> table <strong>does NOT enforce the <code>entities(id)</code> foreign key</strong>, so dangling rows re-insert cleanly. No normalization, no case-folding, no silent dedup, no FK rejection.</p>
     <p class="small"><span class="c-g"><strong>Verification:</strong></span> AC1 per-row diff shows <code>aliases</code> count <code>834 = 834</code> ✓</p>
   </div>
 </div>
-<figcaption>AC3. 55 silently-dropped aliases. Root cause: over-eager case normalisation during import. Fix: exact-string preservation from frontmatter — the vault is authoritative.</figcaption>
+<figcaption>AC3. 55 silently-dropped aliases. Root cause (empirically verified): 55 dangling-FK alias rows, dropped by export's canonical_id grouping and rejected by the derived table's entities(id) FK. Fix: write all rows verbatim + drop the FK on the derived aliases table.</figcaption>
 </figure>
 
 <!-- ═══ 8 ═══ -->
@@ -404,7 +404,7 @@ B.id=2, canonical_id→1 (A)</pre>
     <div class="zone-title c-g">NEW FILES — CAN CREATE · CAN MODIFY · THIS IS THE BLAST RADIUS</div>
     <p style="font-size:.85rem"><code>scripts/graph-db.py</code> &nbsp;|&nbsp; <code>scripts/graph-export.py</code> &nbsp;|&nbsp; <code>scripts/graph-build.py</code> &nbsp;|&nbsp; <code>tests/test_graph_roundtrip.py</code></p>
     <p style="font-size:.85rem"><code>wiki/graph/SCHEMA.md</code> &nbsp;|&nbsp; <code>wiki/graph/{papers,entities,claims,_graph}/</code> (export target dirs, empty until export runs) &nbsp;|&nbsp; <code>wiki/graph/graph-export.json</code> (committed snapshot)</p>
-    <p style="font-size:.85rem"><code>.gitignore</code> (add <code>.vault-meta/graph/graph.db</code> entry) &nbsp;|&nbsp; <code>pyproject.toml</code> (add PyYAML dependency)</p>
+    <p style="font-size:.85rem"><code>.gitignore</code> (add <code>.vault-meta/graph/graph.db</code> entry) &nbsp;|&nbsp; <code>pyproject.toml</code> (add <strong>PyYAML</strong> + <strong>networkx</strong> dependencies — networkx is required; without it the white-space species collapses 312→1 and AC2 silently passes wrong)</p>
   </div>
 </div>
 <figcaption>Everything new (green) vs everything read-only (red). The live sqlite db is outside the repo — copied for the test, never written to.</figcaption>

@@ -13,6 +13,7 @@ Fuses the standalone `graphbuilding` skill (formerly `~/.claude/skills/graphbuil
   - `graph_db.root()` — one path-compressing, cycle- and dangling-safe entity-resolution helper that replaces every inline `COALESCE(canonical_id, id)` (which was single-hop and wrong on chains). Shared by all five scripts.
   - `graph-gaps.py` — native five-species scanner (frontier / debate / replication / coverage / white-space), `seed=42` deterministic Louvain.
   - `graph-resolve.py` — two-tier entity dedup: exact-name (T1), embedding similarity via ollama nomic-embed (T2A), token-Jaccard fallback (T2B). Proposes only; a human confirms merges.
+  - `graph-validate.py` — self-healing integrity guard. Reports the four drift species (dangling / chain / self-loop on entities; orphan = claim → missing entity); `--heal` fixes the pointer-drift class via the shared `root()` (never throws, idempotent). Real derived db validates clean. Wired into the `verifier` agent (item 7) as a read-only pre-commit gate so drift can never be committed, and into `make test-graph` / `make validate-graph`.
 - **`wiki/graph/`** structured markdown vault (98 papers, 1444 entities, 1052 claims) + `graph-export.json` portable snapshot (tracked) + `SCHEMA.md` frontmatter contract.
 - **`tests/test_graph_roundtrip.py` / `test_graph_gaps.py` / `test_graph_resolve.py`** — 39 tests; round-trip is the acceptance oracle (per-row `SELECT *` 9-table diff + 5-species gap diff through the independent oracle scanner + source-md5-untouched). `make test-graph` target added.
 
@@ -24,6 +25,7 @@ Fuses the standalone `graphbuilding` skill (formerly `~/.claude/skills/graphbuil
 
 - `.claude-plugin/plugin.json` + `marketplace.json` version 1.9.2 → 1.10.0; added `knowledge-graph` / `claim-graph` / `research-gaps` / `entity-resolution` keywords.
 - `pyproject.toml` adds PyYAML + networkx (graph deps) under `uv`; `.gitignore` ignores the derived `.vault-meta/graph/graph.db` (the `wiki/graph/` markdown + JSON snapshot are tracked), `.pytest_cache/`, and the local `.claude/` working dir.
+- **Oracle retired** (reversibly): `~/.graphbuilding` and `~/.claude/skills/graphbuilding` moved to `*.retired-20260606`. The plugin is now self-sufficient — full suite runs 44 passed / 4 skipped with the oracle absent (only the round-trip integration tests skip, by design), and the standalone build→gaps→validate pipeline still yields 899 gaps + 0 drift. Restore by renaming the `.retired-*` paths back.
 
 ### Removed
 

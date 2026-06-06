@@ -140,21 +140,25 @@ between "engine migrated" and "usable, clean, packaged plugin":
 
 ---
 
-## 5. The oracle: keep it for now (do not delete yet)
+## 5. The oracle: RETIRED 2026-06-06 (reversibly)
 
-The original `~/.claude/skills/graphbuilding` skill and `~/.graphbuilding/graph.db` are now
-**functionally redundant** — everything they do lives in this repo. But they are **external to
-this repository** and they are this report's verification safety-net. I did **not** delete
-them.
+The original `~/.claude/skills/graphbuilding` skill and `~/.graphbuilding/graph.db` were
+**functionally redundant** — everything they did now lives in this repo and is verified — so
+they have been **retired by reversible `mv`**:
 
-**Recommendation:** keep the oracle until you have used `/graph` for a few real sessions and
-are confident. When you are, retire it deliberately:
-```bash
-# only after you're satisfied — this is outside the repo, not reversible via git
-mv ~/.graphbuilding ~/.graphbuilding.retired-$(date +%Y%m%d)
-mv ~/.claude/skills/graphbuilding ~/.claude/skills/graphbuilding.retired-$(date +%Y%m%d)
 ```
-The portable truth is already in git (`wiki/graph/` + `graph-export.json`), so nothing is lost.
+~/.graphbuilding              → ~/.graphbuilding.retired-20260606
+~/.claude/skills/graphbuilding → ~/.claude/skills/graphbuilding.retired-20260606
+```
+
+**Self-sufficiency proof (oracle absent):** the full graph suite runs **44 passed, 4 skipped**
+(only the 4 round-trip integration tests skip, by design, since they need the live oracle),
+and the standalone pipeline — `graph-build` from markdown → `graph-gaps` → `graph-validate` —
+produces **899 gaps (exact)** and **0 integrity drift**. The plugin needs nothing external.
+
+**To restore** (if you ever want the oracle back): `mv` each `.retired-20260606` path back to
+its original name. The portable truth is already in git (`wiki/graph/` + `graph-export.json`),
+so even the retired copies are not load-bearing.
 
 ---
 
@@ -166,11 +170,17 @@ The portable truth is already in git (`wiki/graph/` + `graph-export.json`), so n
 | 1 | Migration + round-trip test | ✅ done, **verified lossless** |
 | 2 | Native gap engine | ✅ done, **verified == oracle** |
 | 3 | Entity resolution + embedding dedup | ✅ done, **finds real dups** |
-| 4 | Skill surface (+ cache + verifier ext) | ✅ **skill surface shipped this session**; `wiki/graph/hot.md` materialized-cache and the `verifier` graph-integrity extension are **deferred** (optional polish, not migration-blocking) |
-| 5 | Consolidation + packaging | ✅ packaging + cleanup shipped; git-lfs for raw PDFs is **deferred** (no PDFs are tracked today) |
+| 4 | Skill surface (+ cache + verifier ext) | ✅ skill surface shipped; ✅ **`graph-validate.py` integrity guard + `verifier` graph-integrity extension shipped**; `wiki/graph/hot.md` materialized-cache **deferred** (optional, non-blocking) |
+| 5 | Consolidation + packaging | ✅ packaging + cleanup shipped; ✅ **oracle retired (reversible, §5)**; git-lfs for raw PDFs **N/A** (no PDFs tracked) |
 
-**Deferred, explicitly (not forgotten):** `hot.md` graph-signal cache, `verifier` agent graph
-invariants, git-lfs policy. None block using the graph; all are additive.
+**Deferred, explicitly (not forgotten):** only `wiki/graph/hot.md` materialized gap-signal
+cache remains (optional, non-blocking, additive). The `verifier` graph-integrity extension is
+now shipped (`graph-validate.py` + verifier item 7); git-lfs is N/A (no PDFs tracked).
+
+**Future, spec-gated (need a grill before code):** native `graph-ingest.py` (new paper → graph
+markdown in one command), full-paper retrieval (index paper bodies so graph traversal can pull
+related papers' full text), and a native `graph-bridge.py` (idea-bridge / next-paper proposal
+synthesis — the oracle's `bridge.py` capability, not yet migrated). See §9.
 
 ---
 

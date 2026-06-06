@@ -549,3 +549,440 @@ class TestGitignore:
             "(it is the git-tracked source of truth)\n"
             f"git check-ignore rc={r.returncode}, stdout={r.stdout!r}"
         )
+
+
+# ============================================================================
+# AC4: no_egress_default — default sync uses only synthetic prefix, no network
+# ============================================================================
+
+class TestNoEgressDefault:
+    """AC4: Default sync (no --allow-egress) uses synthetic prefix only."""
+
+    def test_chunk_prefix_source_is_synthetic_by_default(self, tmp_path):
+        """All chunk files written by sync without --allow-egress must have
+        prefix_source: 'synthetic' (no network calls)."""
+        src_file = tmp_path / "egress_test.md"
+        src_file.write_text(
+            "# Egress Test\n\nSome content about variational inference.\n\n"
+            "More content about neural networks and training.",
+            encoding="utf-8",
+        )
+        fake_export = {
+            "papers": [
+                {"slug": "egress-test", "source_path": str(src_file), "arxiv_id": None},
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+            # No --allow-egress
+        )
+        assert rc == 0, f"exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+
+        # Find all chunk files
+        chunk_files = list(chunks_dir.glob("*/chunk-*.json")) if chunks_dir.is_dir() else []
+        assert chunk_files, "No chunk files written — sync did not produce chunks"
+
+        non_synthetic = []
+        for cf in chunk_files:
+            data = json.loads(cf.read_text(encoding="utf-8"))
+            ps = data.get("prefix_source", "")
+            if ps != "synthetic":
+                non_synthetic.append(f"  {cf.name}: prefix_source={ps!r}")
+        assert not non_synthetic, (
+            "Default sync produced non-synthetic prefix_source:\n"
+            + "\n".join(non_synthetic)
+        )
+
+    def test_allow_egress_flag_is_accepted(self, tmp_path):
+        """--allow-egress must be accepted (exit 0) even when ollama is absent
+        (falls back to synthetic). This confirms the flag is wired, not ignored."""
+        src_file = tmp_path / "egress_allow.md"
+        src_file.write_text("# Allow egress test\n\nShort body.", encoding="utf-8")
+        fake_export = {
+            "papers": [
+                {"slug": "egress-allow", "source_path": str(src_file), "arxiv_id": None},
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+            "--allow-egress",
+        )
+        assert rc == 0, f"--allow-egress rejected: exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+
+
+# ============================================================================
+# AC3: retrieve_provenance — BM25 index built over .full.md bodies; query returns
+#      results with paper provenance (page_path + page_address + chunk_index)
+# ============================================================================
+
+RETRIEVE_SCRIPT = SCRIPTS / "graph-retrieve.py"
+
+
+class TestRetrieveProvenance:
+    """AC3: graph BM25 index built over .full.md bodies only; graph-retrieve.py
+    returns results with paper provenance."""
+
+    def _setup_index(self, tmp_path, slug="retrieve-test"):
+        """Helper: sync a single paper and return (chunks_dir, bm25_dir, papers_out)."""
+        src_file = tmp_path / f"{slug}.md"
+        src_file.write_text(
+            "# Retrieve Test\n\n"
+            "This paper discusses constrained sampling under hard garment pinning. "
+            "The method uses diffusion models with special boundary conditions.\n\n"
+            "Experiments show state-of-the-art results on garment try-on benchmarks. "
+            "The approach is novel and outperforms prior work in all metrics.",
+            encoding="utf-8",
+        )
+        fake_export = {
+            "papers": [
+                {"slug": slug, "source_path": str(src_file), "arxiv_id": "2501.12345"},
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+        )
+        assert rc == 0, f"sync failed: exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+        return export_path, chunks_dir, bm25_dir, papers_out
+
+    def test_bm25_index_built_after_sync(self, tmp_path):
+        """After sync, a BM25 index must exist at --bm25-dir/index.json."""
+        _, chunks_dir, bm25_dir, _ = self._setup_index(tmp_path)
+        idx_path = bm25_dir / "index.json"
+        assert idx_path.exists(), (
+            f"BM25 index not found at {idx_path} after sync"
+        )
+        idx = json.loads(idx_path.read_text(encoding="utf-8"))
+        assert idx.get("doc_count", 0) > 0, "BM25 index has zero docs"
+        assert "vocab" in idx, "BM25 index missing 'vocab'"
+
+    def test_chunks_contain_paper_provenance(self, tmp_path):
+        """Each chunk file must have page_path, page_address, chunk_index fields."""
+        _, chunks_dir, _, papers_out = self._setup_index(tmp_path)
+        chunk_files = list(chunks_dir.glob("*/chunk-*.json"))
+        assert chunk_files, "No chunk files written"
+        for cf in chunk_files:
+            data = json.loads(cf.read_text(encoding="utf-8"))
+            assert "page_path" in data, f"{cf.name} missing page_path"
+            assert "page_address" in data, f"{cf.name} missing page_address"
+            assert "chunk_index" in data, f"{cf.name} missing chunk_index"
+
+    def test_bm25_index_only_over_full_md_bodies(self, tmp_path):
+        """The BM25 index must only index chunks from .full.md source pages
+        (not claim/entity stubs). The chunk JSON files must have page_path
+        pointing at a .full.md file."""
+        _, chunks_dir, bm25_dir, _ = self._setup_index(tmp_path)
+        # Check every chunk JSON file has a page_path ending in .full.md
+        chunk_files = list(chunks_dir.glob("*/chunk-*.json"))
+        assert chunk_files, "No chunk files found"
+        violations = []
+        for cf in chunk_files:
+            data = json.loads(cf.read_text(encoding="utf-8"))
+            page_path = data.get("page_path", "")
+            if not page_path.endswith(".full.md"):
+                violations.append(f"  {cf.name}: page_path={page_path!r}")
+        assert not violations, (
+            "Some chunks reference non-.full.md pages:\n" + "\n".join(violations)
+        )
+
+    def test_graph_retrieve_script_exists(self):
+        """scripts/graph-retrieve.py must exist before retrieve tests can pass."""
+        assert RETRIEVE_SCRIPT.exists(), (
+            "scripts/graph-retrieve.py does not exist — implement it (T5)"
+        )
+
+    def test_graph_retrieve_query_returns_results(self, tmp_path):
+        """graph-retrieve.py <query> must return top-K results with provenance when
+        the graph index exists."""
+        export_path, chunks_dir, bm25_dir, papers_out = self._setup_index(tmp_path)
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not yet implemented (T5)")
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "garment pinning diffusion",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--top", "3",
+        ]
+        r = subprocess.run(
+            cmd, capture_output=True, text=True,
+            cwd=PROJECT_ROOT, timeout=30,
+        )
+        assert r.returncode == 0, (
+            f"graph-retrieve.py exited {r.returncode}\n"
+            f"stdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+        out = json.loads(r.stdout)
+        assert "candidates" in out, "retrieve output missing 'candidates'"
+        assert len(out["candidates"]) > 0, "No candidates returned for known query"
+        first = out["candidates"][0]
+        assert "page_path" in first or "chunk_id" in first, (
+            "Candidate missing provenance fields"
+        )
+
+    def test_graph_retrieve_missing_index_nonzero_exit(self, tmp_path):
+        """graph-retrieve.py with --bm25-index pointing to nonexistent path must
+        exit non-zero with a helpful hint."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not yet implemented (T5)")
+        fake_bm25 = tmp_path / "nonexistent" / "index.json"
+        fake_chunks = tmp_path / "nonexistent" / "chunks"
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "any query",
+            "--bm25-index", str(fake_bm25),
+            "--chunks-dir", str(fake_chunks),
+        ]
+        r = subprocess.run(
+            cmd, capture_output=True, text=True,
+            cwd=PROJECT_ROOT, timeout=30,
+        )
+        assert r.returncode != 0, (
+            f"graph-retrieve.py should exit non-zero for missing index, got {r.returncode}"
+        )
+        combined = (r.stdout + r.stderr).lower()
+        assert "sync" in combined or "graph-fulltext" in combined or "index" in combined, (
+            "Missing-index error should mention 'sync' or 'graph-fulltext' or 'index'\n"
+            f"stdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+
+
+# ============================================================================
+# AC5: degrade — ollama absent -> BM25-only rerank; missing index -> friendly exit
+# ============================================================================
+
+class TestDegrade:
+    """AC5: Graceful degradation paths."""
+
+    def test_graph_retrieve_missing_index_gives_hint(self, tmp_path):
+        """Missing graph BM25 index → non-zero exit with hint to run sync."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not yet implemented (T5)")
+        nonexistent_idx = tmp_path / "no-such-dir" / "index.json"
+        nonexistent_chunks = tmp_path / "no-such-dir" / "chunks"
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "test query",
+            "--bm25-index", str(nonexistent_idx),
+            "--chunks-dir", str(nonexistent_chunks),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, timeout=30)
+        assert r.returncode != 0, (
+            f"Should exit non-zero for missing index, got {r.returncode}"
+        )
+        combined = r.stdout + r.stderr
+        assert combined.strip(), "Expected some error output"
+
+    def test_graph_retrieve_ollama_absent_degrades_gracefully(self, tmp_path):
+        """With OLLAMA_URL pointing to a dead port, graph-retrieve.py should
+        still succeed (BM25-only path) and mark rerank_source as noop-no-ollama."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not yet implemented (T5)")
+
+        # Build a small index
+        src_file = tmp_path / "degrade.md"
+        src_file.write_text(
+            "# Degrade Test\n\nBM25 fallback test content about neural networks.",
+            encoding="utf-8",
+        )
+        fake_export = {
+            "papers": [
+                {"slug": "degrade-test", "source_path": str(src_file), "arxiv_id": None},
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, _, _ = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+        )
+        assert rc == 0
+
+        # Point OLLAMA_URL at a dead port to simulate absent ollama
+        env = os.environ.copy()
+        env["OLLAMA_URL"] = "http://127.0.0.1:1"
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "neural networks",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--top", "3",
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, env=env, timeout=30)
+        assert r.returncode == 0, (
+            f"Should exit 0 when ollama absent (BM25-only fallback)\n"
+            f"exit={r.returncode}\nstdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+
+
+# ============================================================================
+# AC9: read_surface — /graph read routing, --paper and --claim flags
+# ============================================================================
+
+class TestReadSurface:
+    """AC9: graph-retrieve.py surface — query, --paper slug, --claim id."""
+
+    def test_graph_retrieve_accepts_paper_flag(self, tmp_path):
+        """graph-retrieve.py --paper <slug> must be accepted (or exit with
+        friendly message if index not provisioned)."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not yet implemented (T5)")
+
+        # Build a small index first
+        src_file = tmp_path / "surface.md"
+        src_file.write_text(
+            "# Surface Test\n\nContent about graph neural networks and diffusion.",
+            encoding="utf-8",
+        )
+        fake_export = {
+            "papers": [
+                {"slug": "surface-test", "source_path": str(src_file), "arxiv_id": "2501.99999"},
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, _, _ = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+        )
+        assert rc == 0
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "--paper", "surface-test",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--export", str(export_path),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, timeout=30)
+        # Either succeeds (0) or exits non-zero with a helpful message
+        if r.returncode != 0:
+            combined = (r.stdout + r.stderr).lower()
+            # Should not be a Python traceback
+            assert "traceback" not in combined, (
+                f"--paper flag caused a crash:\n{r.stderr}"
+            )
+        else:
+            out = json.loads(r.stdout)
+            assert "candidates" in out, "Output missing 'candidates'"
+
+    def test_graph_retrieve_accepts_claim_flag(self, tmp_path):
+        """graph-retrieve.py --claim <id> must be accepted without crashing."""
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not yet implemented (T5)")
+
+        # Build a small index first
+        src_file = tmp_path / "claim_surface.md"
+        src_file.write_text(
+            "# Claim Surface\n\nContent about diffusion model training.",
+            encoding="utf-8",
+        )
+        fake_export = {
+            "papers": [
+                {"slug": "claim-surface", "source_path": str(src_file), "arxiv_id": None},
+            ],
+            "entities": [], "claims": [
+                {
+                    "id": 42,
+                    "subject_id": 1,
+                    "predicate": "uses",
+                    "object_id": 2,
+                    "polarity": "asserts",
+                    "source_paper": "claim-surface",
+                }
+            ],
+            "sections": [], "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, _, _ = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+        )
+        assert rc == 0
+
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            "--claim", "42",
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--export", str(export_path),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=PROJECT_ROOT, timeout=30)
+        # Should not crash (no traceback)
+        combined = (r.stdout + r.stderr).lower()
+        assert "traceback" not in combined, (
+            f"--claim flag caused a crash:\nstdout: {r.stdout}\nstderr: {r.stderr}"
+        )

@@ -62,6 +62,51 @@ preserved because claims reference them). Body is a human render.
 `predicates.md`, `entity_edges.md`, `citation_links.md` — auxiliary tables stored as
 frontmatter `rows:` lists. Navigation/citation edges are not part of the claim moat.
 
+## papers/<slug>.full.md — full-text contract (Phase 4, P4)
+
+`wiki/graph/papers/<slug>.full.md` is the **git-tracked, verbatim full text** of a Tier-A
+paper. It is written (and idempotently re-written) by `graph-fulltext.py sync`.
+
+```yaml
+type: paper-fulltext
+slug: <slug>                      # matches the filename stem and papers/<slug>.md
+arxiv_id: <id|null>               # arxiv id if available
+source_path: <absolute path>      # the resolved source .md (read-only upstream)
+paper: "[[<slug>]]"               # Obsidian wikilink back to the papers/<slug>.md node
+```
+Body: verbatim byte-equal copy of the source `.md` content (no reflow, no truncation).
+
+The `.full.md` files power `/graph read` — a BM25+rerank retrieval layer built by
+`graph-fulltext.py sync` over these bodies only (not over claim/entity stubs or the
+structured `papers/<slug>.md`). The retrieval index lives under
+`.vault-meta/graph/{chunks,bm25}/` which is **derived and gitignored** — deletable and
+rebuildable at any time.
+
+### Add / re-add a paper
+
+**First time (Tier-A: source .md exists at source_path):**
+
+1. Ensure the paper is in `graph-export.json` with a resolvable `source_path` pointing to
+   a real `.md` file (or a bare `~/.paper-scholar/<dir>` containing exactly one `.md`).
+2. Run `uv run python scripts/graph-fulltext.py sync`
+   → writes `wiki/graph/papers/<slug>.full.md` (verbatim body + contract frontmatter)
+   → builds `.vault-meta/graph/chunks/` and `.vault-meta/graph/bm25/index.json`
+3. Verify: `uv run python scripts/graph-retrieve.py "a phrase from the paper"` returns
+   a passage with `page_path: wiki/graph/papers/<slug>.full.md`.
+
+**Re-add after source update (idempotent):**
+
+Re-run step 2; if the source `.md` has not changed, the `.full.md` and index are
+byte-identical. If it changed, the `.full.md` is overwritten and the index rebuilt.
+
+**Tier-B paper (PDF or no .md yet):**
+
+`graph-fulltext.py sync` skips it with one log line and adds it to the "ready to add
+later" backlog. Once the PDF is extracted to `.md`, register the new path in
+`graph-export.json` as `source_path` and re-run sync.
+
+---
+
 ## Forward path — graph-ingest.py (Phase 4)
 
 New papers enter the graph through `graph-ingest.py` (Phase 4), which writes

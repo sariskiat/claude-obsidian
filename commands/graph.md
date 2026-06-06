@@ -23,6 +23,23 @@ Read the `graph` skill (`skills/graph/SKILL.md`). Then route on `$ARGUMENTS`:
   Present the ranked proposals (exact tier-1 first, fuzzy tier-2 after). **Never auto-merge** —
   the user confirms each one.
 
+- **read** `<query>` | **read** `--paper <slug>` | **read** `--claim <id>` — Retrieve full-text
+  passages from indexed papers. Requires `graph-fulltext.py sync` to have been run first
+  (builds the graph BM25 index). Uses BM25 + local rerank (ollama/nomic-embed-text when
+  available; degrades to BM25-only if not). Outputs ranked passages with paper+claim
+  provenance (page_path, snippet).
+  ```bash
+  # free-text query across all indexed papers
+  uv run python scripts/graph-retrieve.py "constrained sampling garment pinning"
+  # all top passages from one paper
+  uv run python scripts/graph-retrieve.py --paper <slug>
+  # trace a claim to its source paper then return passages
+  uv run python scripts/graph-retrieve.py --claim <id> --export wiki/graph/graph-export.json
+  # build / refresh the graph full-text index first if not already done
+  uv run python scripts/graph-fulltext.py sync
+  ```
+  If the index is missing, exit 10 with a "run graph-fulltext.py sync first" hint.
+
 - **export** `<source.db>` — Re-export a sqlite graph into `wiki/graph/` markdown + snapshot
   (reads a copy, never mutates the source):
   `uv run python scripts/graph-export.py <source.db> wiki/graph`

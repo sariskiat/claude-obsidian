@@ -2,7 +2,7 @@
 # Test runner entry points for DragonScale and vault tooling.
 
 .PHONY: test test-address test-tiling test-boundary test-bm25 test-retrieve \
-        test-lock test-concurrent test-mode test-contextual test-graph \
+        test-lock test-concurrent test-mode test-contextual test-graph test-fulltext \
         validate-graph setup-dragonscale setup-retrieve setup-mode \
         clean-test-state help
 
@@ -19,6 +19,7 @@ help:
 	@echo "  make test-mode        scripts/wiki-mode.py tests (python, hermetic)"
 	@echo "  make test-contextual  scripts/contextual-prefix.py cache-floor tests (python, hermetic)"
 	@echo "  make test-graph       graph fusion round-trip + gaps + resolve + validate (uv, needs PyYAML+networkx)"
+	@echo "  make test-fulltext    P4 full-paper retrieval suite (uv, hermetic)"
 	@echo "  make validate-graph   rebuild derived index + run the integrity guard (read-only)"
 	@echo "  make setup-dragonscale Run bin/setup-dragonscale.sh against this vault"
 	@echo "  make setup-retrieve   Run bin/setup-retrieve.sh against this vault (opt-in v1.7)"
@@ -68,6 +69,10 @@ test-contextual:
 test-graph:
 	@echo "=== graph fusion: roundtrip + gaps + resolve + validate (uv) ==="
 	@uv run python -m pytest tests/test_graph_roundtrip.py tests/test_graph_gaps.py tests/test_graph_resolve.py tests/test_graph_validate.py -q
+
+test-fulltext:
+	@echo "=== P4 full-paper retrieval suite (uv) ==="
+	@uv run python -m pytest tests/test_graph_fulltext.py -q
 
 validate-graph:
 	@echo "=== graph integrity guard (read-only) ==="

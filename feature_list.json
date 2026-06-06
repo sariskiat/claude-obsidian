@@ -1,13 +1,13 @@
 {
   "schema_version": 2,
-  "current_feature": "graph-vault-migration",
+  "current_feature": "graph-native-gaps",
   "wip_limit": 1,
   "features": {
     "graph-vault-migration": {
       "id": "graph-vault-migration",
       "title": "Graphbuilding Fusion P1 \u2014 markdown-vault migration round-trip",
       "phase": "passing",
-      "status": "in_progress",
+      "status": "completed",
       "problem_classification": "unique",
       "problem_statement": "The claim graph lives only as a sqlite db in a scattered dotdir (~/.graphbuilding/graph.db): not hand-editable, not git-tracked, and reads force repair + full recompute because the write path never guaranteed read invariants.",
       "jtbd": "When I want to trust and hand-fix my claim graph, I want it stored as structured markdown I can edit and version, so I can rebuild a queryable index from it losslessly and stop re-mining on every read.",
@@ -128,7 +128,10 @@
           ],
           "depends_on": [],
           "verification": "bash -c 'uv run python -c \"import yaml, networkx\" && git check-ignore .vault-meta/graph/graph.db'",
-          "evidence": ["deps importable (PyYAML 6.0.3, networkx 3.6.1)", "git check-ignore .vault-meta/graph/graph.db exits 0"],
+          "evidence": [
+            "deps importable (PyYAML 6.0.3, networkx 3.6.1)",
+            "git check-ignore .vault-meta/graph/graph.db exits 0"
+          ],
           "scope_map": {
             "modify": [
               "pyproject.toml",
@@ -152,7 +155,11 @@
             "T1"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k root",
-          "evidence": ["8/8 root+coalesce tests pass", "root() handles chain/cycle/self-loop/dangling", "no inline COALESCE(canonical_id,id) in graph_db.py"],
+          "evidence": [
+            "8/8 root+coalesce tests pass",
+            "root() handles chain/cycle/self-loop/dangling",
+            "no inline COALESCE(canonical_id,id) in graph_db.py"
+          ],
           "scope_map": {
             "modify": [
               "scripts/graph_db.py",
@@ -178,7 +185,12 @@
             "T2"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k 'source_untouched or alias'",
-          "evidence": ["export writes 9 tables to wiki/graph/", "graph-export.json contains all rows including dangling aliases", "source db md5 unchanged after export", "SCHEMA.md auto-generated"],
+          "evidence": [
+            "export writes 9 tables to wiki/graph/",
+            "graph-export.json contains all rows including dangling aliases",
+            "source db md5 unchanged after export",
+            "SCHEMA.md auto-generated"
+          ],
           "scope_map": {
             "modify": [
               "scripts/graph-export.py",
@@ -204,7 +216,12 @@
             "T3"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k 'table_counts or alias'",
-          "evidence": ["build creates derived db with all 9 tables", "aliases table has no FK constraint (AC3 fix)", "root() self-heals drift on insert", "per-row diff confirms 9/9 tables byte-equal"],
+          "evidence": [
+            "build creates derived db with all 9 tables",
+            "aliases table has no FK constraint (AC3 fix)",
+            "root() self-heals drift on insert",
+            "per-row diff confirms 9/9 tables byte-equal"
+          ],
           "scope_map": {
             "modify": [
               "scripts/graph-build.py",
@@ -229,7 +246,10 @@
             "T4"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q",
-          "evidence": ["16/16 tests pass in 5.68s", "round-trip: copy live db → export → build → per-row diff → gap species → alias count → source md5"],
+          "evidence": [
+            "16/16 tests pass in 5.68s",
+            "round-trip: copy live db \u2192 export \u2192 build \u2192 per-row diff \u2192 gap species \u2192 alias count \u2192 source md5"
+          ],
           "scope_map": {
             "modify": [
               "tests/test_graph_roundtrip.py"
@@ -252,13 +272,168 @@
             "T5"
           ],
           "verification": "bash -c 'grep -qi \"forward path\\|graph-ingest\\|new paper\" wiki/graph/SCHEMA.md'",
-          "evidence": ["SCHEMA.md defines frontmatter contract", "forward path documented for graph-ingest.py (P4)", "hand-authored example: paper/entity/claim through graph-build.py"],
+          "evidence": [
+            "SCHEMA.md defines frontmatter contract",
+            "forward path documented for graph-ingest.py (P4)",
+            "hand-authored example: paper/entity/claim through graph-build.py"
+          ],
           "scope_map": {
             "modify": [
               "wiki/graph/SCHEMA.md"
             ],
             "read_only": [],
             "metric": "AC8 documented design check"
+          }
+        }
+      ]
+    },
+    "graph-native-gaps": {
+      "id": "graph-native-gaps",
+      "title": "Native Gap Scanner \u2014 replace oracle gaps.py with repo-native analytics",
+      "phase": "passing",
+      "status": "in_progress",
+      "problem_classification": "unique",
+      "problem_statement": "The 5-species gap scanner lives in the oracle dotdir (~/.claude/skills/graphbuilding/scripts/gaps.py), uses broken COALESCE(canonical_id,id) for entity resolution, and is not in this repo \u2014 it cannot evolve with the vault.",
+      "jtbd": "When I scan my claim graph for research gaps, I want a native gap scanner in this repo that uses root() (not broken COALESCE), runs on the derived db, and produces identical results to the oracle, so the analytics engine lives with the vault and evolves with it.",
+      "user_context": "Single-tenant fork owner (saris). Phase 2 of the graphbuilding-fusion epic.",
+      "spec_file": "specs/graph-native-gaps.md",
+      "spec_status": "approved",
+      "approval": {
+        "approved_by": "saris",
+        "approved_on": "2026-06-06",
+        "domain_lead": true,
+        "tech_lead": true
+      },
+      "depends_on": [
+        "graph-vault-migration"
+      ],
+      "blocks": [],
+      "scope_map": {
+        "modify": [
+          "scripts/graph-gaps.py",
+          "tests/test_graph_gaps.py"
+        ],
+        "read_only": [
+          "scripts/graph_db.py",
+          "scripts/graph-export.py",
+          "scripts/graph-build.py",
+          "tests/test_graph_roundtrip.py",
+          "wiki/graph/**",
+          "pyproject.toml"
+        ],
+        "metric": "gap count parity with oracle: 899 total, per-species exact (frontier 65, debate 0, replication 473, coverage 49, white-space 312)"
+      },
+      "metric": {
+        "name": "gap_count_parity",
+        "baseline": "oracle on derived db: 899 total (65/0/473/49/312)",
+        "target": "native on derived db: 899 total (65/0/473/49/312)",
+        "direction": "binary_pass",
+        "user_value_check": "identical gap counts mean the native scanner is a drop-in replacement \u2014 the analytics engine now lives in the repo",
+        "how_measured": "uv run python -m pytest tests/test_graph_gaps.py -q",
+        "keep_revert_rule": "keep only if all gap counts match oracle exactly; revert otherwise",
+        "simplicity_criterion": "one shared graph_db.root() for entity resolution, no oracle imports"
+      },
+      "acceptance_criteria": [
+        {
+          "id": "AC1",
+          "text": "Gap counts match oracle exactly on derived db (899 total)",
+          "verification": "uv run python -m pytest tests/test_graph_gaps.py -q -k counts",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC2",
+          "text": "Per-species: frontier 65, debate 0, replication 473, coverage 49, white-space 312",
+          "verification": "uv run python -m pytest tests/test_graph_gaps.py -q -k species",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC3",
+          "text": "Uses graph_db.root() \u2014 no COALESCE(canonical_id, id) anywhere",
+          "verification": "bash -c \"grep -c COALESCE scripts/graph-gaps.py; test $? -eq 1\"",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC4",
+          "text": "Zero imports from oracle dotdir",
+          "verification": "bash -c \"grep -r skills/graphbuilding scripts/graph-gaps.py; test $? -eq 1\"",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC5",
+          "text": "--json output schema valid",
+          "verification": "uv run python scripts/graph-gaps.py --json --top 5 | python3 -c \"import json,sys; d=json.load(sys.stdin); assert all(k in d[0] for k in [\"species\",\"description\",\"entities\",\"claims\",\"gap_confidence\",\"explanation\"])\"",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC6",
+          "text": "P1 suite still green",
+          "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC7",
+          "text": "Derived db missing \u2192 exit 1",
+          "verification": "bash -c \"uv run python scripts/graph-gaps.py --db /nonexistent 2>&1; test $? -eq 1\"",
+          "expected_exit": 0
+        },
+        {
+          "id": "AC8",
+          "text": "Full P2 suite green",
+          "verification": "uv run python -m pytest tests/test_graph_gaps.py -q",
+          "expected_exit": 0
+        }
+      ],
+      "tasks": [
+        {
+          "id": "T1",
+          "title": "scripts/graph-gaps.py: 5-species scanner using graph_db.root(), zero oracle imports",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            "scripts/graph-gaps.py"
+          ],
+          "depends_on": [],
+          "verification": "uv run python scripts/graph-gaps.py --json --top 1",
+          "evidence": [
+            "scripts/graph-gaps.py: 5-species scanner using graph_db.root()",
+            "12/12 tests pass",
+            "899 total gaps match oracle"
+          ],
+          "scope_map": {
+            "modify": [
+              "scripts/graph-gaps.py"
+            ],
+            "read_only": [
+              "scripts/graph_db.py"
+            ],
+            "metric": "AC3 AC4 AC5"
+          }
+        },
+        {
+          "id": "T2",
+          "title": "tests/test_graph_gaps.py: count parity, schema validation, edge cases",
+          "agent": "tildi-generator",
+          "status": "completed",
+          "files": [
+            "tests/test_graph_gaps.py"
+          ],
+          "depends_on": [
+            "T1"
+          ],
+          "verification": "uv run python -m pytest tests/test_graph_gaps.py -q",
+          "evidence": [
+            "tests/test_graph_gaps.py: 12 tests",
+            "count parity, schema validation, edge cases all green"
+          ],
+          "scope_map": {
+            "modify": [
+              "tests/test_graph_gaps.py"
+            ],
+            "read_only": [
+              "scripts/graph-gaps.py",
+              ".vault-meta/graph/graph.db"
+            ],
+            "metric": "AC1 AC2 AC8"
           }
         }
       ]

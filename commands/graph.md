@@ -40,6 +40,24 @@ Read the `graph` skill (`skills/graph/SKILL.md`). Then route on `$ARGUMENTS`:
   ```
   If the index is missing, exit 10 with a "run graph-fulltext.py sync first" hint.
 
+- **bridge** — Rank white-space community pairs into justified next-paper bridge proposals,
+  grounded in the real graph entities and papers (P5 Proposal Finder):
+  ```bash
+  # Ranked proposals (markdown report, default top-10)
+  uv run python scripts/graph-bridge.py --top 10
+  # JSON output for scripting
+  uv run python scripts/graph-bridge.py --json --top 10
+  # Narrative justification via claude-CLI (opt-in egress)
+  uv run python scripts/graph-bridge.py --json --top 10 --synthesize
+  ```
+  Each proposal: community A ↔ community B, score, signal_breakdown
+  (gap_confidence, bridgeability, limitation_pull, richness, direction_relevance),
+  anchor entities (most-connected per side), anchor papers, grounding passages.
+  The gold-standard VTON ↔ diffusion/distillation bridge surfaces near the top.
+  Weights are CLI-tunable (`--w-gap-confidence`, `--w-bridgeability`, etc.).
+  Default run: zero egress (`--synthesize` is the only opt-in egress path).
+  Missing db → non-zero exit with "run graph-build.py" hint.
+
 - **export** `<source.db>` — Re-export a sqlite graph into `wiki/graph/` markdown + snapshot
   (reads a copy, never mutates the source):
   `uv run python scripts/graph-export.py <source.db> wiki/graph`

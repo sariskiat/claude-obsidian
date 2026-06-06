@@ -1,6 +1,6 @@
 ---
 name: graph
-description: "Claim-centric knowledge graph for the Compound Vault (v1.10 Graphbuilding Fusion). The claim is the atom — a typed, signed, quoted proposition — so the vault can answer questions no page-model organizer can: 'Paper A asserts X, Paper B refutes X', replication counts, and the five research-gap species (frontier / debate / replication / coverage / white-space). Markdown under wiki/graph/ is the source of truth; a sqlite index is derived and throwaway. Full-paper retrieval via /graph read uses BM25+rerank over wiki/graph/papers/*.full.md. Migrated natively from the standalone graphbuilding skill — zero oracle dependency. Triggers on: knowledge graph, claim graph, research gaps, what should I study next, find connections across papers, cross-paper, ingest this paper into the graph, graph build, graph gaps, graph resolve, graph read, read paper, retrieve passage, full text, duplicate entities, dedup entities, gap scan, my graph, /graph."
+description: "Claim-centric knowledge graph for the Compound Vault (v1.10 Graphbuilding Fusion). The claim is the atom — a typed, signed, quoted proposition — so the vault can answer questions no page-model organizer can: 'Paper A asserts X, Paper B refutes X', replication counts, and the five research-gap species (frontier / debate / replication / coverage / white-space). Markdown under wiki/graph/ is the source of truth; a sqlite index is derived and throwaway. Full-paper retrieval via /graph read uses BM25+rerank over wiki/graph/papers/*.full.md. Bridge proposals via /graph bridge (graph-bridge.py) rank white-space community pairs into justified next-paper candidates grounded in the real graph. Migrated natively from the standalone graphbuilding skill — zero oracle dependency. Triggers on: knowledge graph, claim graph, research gaps, what should I study next, find connections across papers, cross-paper, bridge proposals, next paper, white-space bridge, ingest this paper into the graph, graph build, graph gaps, graph resolve, graph read, graph bridge, read paper, retrieve passage, full text, duplicate entities, dedup entities, gap scan, my graph, /graph."
 allowed-tools: Read Bash
 ---
 
@@ -117,6 +117,41 @@ snapshot. Reads a **copy** — never mutates the source.
 uv run python scripts/graph-export.py <source.db> wiki/graph
 ```
 
+### 6. Find bridge proposals — turn white-space into next-paper candidates (P5)
+`/graph bridge` (scripts/graph-bridge.py) ranks the 312 white-space community pairs into
+justified "connect A ↔ B because …" proposals grounded in the real graph entities and papers.
+
+```bash
+# Ranked proposals (markdown report, default top-10)
+uv run python scripts/graph-bridge.py --top 10
+
+# JSON output for scripting
+uv run python scripts/graph-bridge.py --json --top 10
+
+# Narrative justification via claude-CLI (opt-in egress only)
+uv run python scripts/graph-bridge.py --json --top 10 --synthesize
+```
+
+**Output per proposal:** `id`, `community_a/b` (id, size, top members by degree),
+`anchor_entities` (most-connected per side), `anchor_papers`, `score`,
+`signal_breakdown` (gap_confidence, bridgeability, limitation_pull, richness,
+direction_relevance), `passages` (full-text snippets from graph-retrieve, degrades
+to "no full text" when index is absent), `already_proposed` (FR7: flags if a
+known bridge entity is already in a community), optional `justification`.
+
+**Gold anchor:** the VTON-community ↔ diffusion-sampling/distillation-community
+bridge surfaces near the top because `direction_relevance=1.0` when one community
+contains virtual try-on entities and the other contains Neon/DNO/distillation entities.
+This encodes [[research-goal-phd-paper]] into the ranking.
+
+**Weights** default to `{gap_confidence: 0.25, bridgeability: 0.20, limitation_pull: 0.15,
+richness: 0.15, direction_relevance: 0.25}`; retune at runtime via `--w-<signal>`.
+
+**Egress posture:** zero egress by default. `--synthesize` is the only opt-in path (uses
+`contextual-prefix.pick_prefix_tier`; falls back to structured template if claude is absent).
+
+**Tests:** `make test-bridge` or `uv run python -m pytest tests/test_graph_bridge.py -q`.
+
 ---
 
 ## Write-side invariants (so drift cannot re-accumulate)
@@ -161,6 +196,10 @@ uv run python -m pytest tests/test_graph_roundtrip.py tests/test_graph_gaps.py t
 # P4 full-paper retrieval suite (AC1–AC9):
 uv run python -m pytest tests/test_graph_fulltext.py -q
 # or: make test-fulltext
+
+# P5 bridge proposals suite (AC1–AC8 + 100-case stress):
+uv run python -m pytest tests/test_graph_bridge.py -q
+# or: make test-bridge
 ```
 Round-trip (`test_graph_roundtrip.py`) is the acceptance oracle: copy a live DB → export →
 build → per-row `SELECT *` diff of all 9 tables + 5-species gap diff (run through the
@@ -169,6 +208,10 @@ build → per-row `SELECT *` diff of all 9 tables + 5-species gap diff (run thro
 `test_graph_fulltext.py` covers: resolver byte-equal import, skip-bodyless, idempotent
 re-run, gitignore policy, zero-egress default, BM25 index build, retrieve provenance,
 ollama-absent degrade, and the --paper/--claim read surface.
+
+`test_graph_bridge.py` covers: deterministic ranking, grounding integrity, gold anchor
+(VTON ↔ Aek), zero-egress default, graceful degradation, JSON schema, wiring, and
+a 100-case stress harness (>=95% well-formed + grounded + non-degenerate + no crash).
 
 ---
 

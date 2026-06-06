@@ -117,7 +117,7 @@ class Proposal:
 # ---------------------------------------------------------------------------
 
 def _canonical_id(conn, entity_id: int) -> int:
-    """Resolve via graph_db.root() — never COALESCE."""
+    """Resolve to canonical root via graph_db.root(). Uses root(), not inline SQL."""
     try:
         return root(conn, entity_id, compress=False)
     except Exception:

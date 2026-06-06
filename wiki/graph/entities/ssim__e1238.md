@@ -1,0 +1,16 @@
+---
+type: entity
+id: 1238
+name: SSIM
+super_type: Measure
+sub_type: Metric
+source_paper: difffit-disentangled-garment-warping-and-texture-refinement-for-virtual-try-on
+is_canonical: false
+canonical_id: 1374
+merge_confidence: 0.95
+metadata: null
+aliases: []
+canonical: '[[ssim__e1374]]'
+---
+
+Structural Similarity Index for measuring reconstruction quality

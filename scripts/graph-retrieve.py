@@ -48,6 +48,7 @@ Exit codes:
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import sys
@@ -169,8 +170,32 @@ def build_candidates(bm25_hits, vault_root: Path, chunks_dir: Path):
             "bm25_score": h["score"],
             "path": h["path"],
             "snippet": chunk_snippet(chunk),
+            "_body_hash": chunk.get("body_hash")
+                          or ("sha256:" + hashlib.sha256(
+                              chunk.get("raw_text", "").encode("utf-8")
+                          ).hexdigest()),
         })
     return candidates
+
+
+def dedup_by_body_hash(candidates: list) -> list:
+    """Collapse candidates that share the same chunk body hash.
+
+    For each unique body_hash, keep only the candidate with the highest
+    bm25_score. Order of surviving candidates is preserved (first win per hash).
+    This removes duplicate-slug redundancy without collapsing genuinely distinct
+    passages of the same paper (different chunks have different hashes).
+    """
+    seen: dict[str, dict] = {}
+    order: list[str] = []
+    for c in candidates:
+        h = c["_body_hash"]
+        if h not in seen:
+            seen[h] = c
+            order.append(h)
+        elif c["bm25_score"] > seen[h]["bm25_score"]:
+            seen[h] = c
+    return [seen[h] for h in order]
 
 
 def main():
@@ -270,6 +295,10 @@ def main():
         slug_suffix = f"{paper_slug_filter}.full.md"
         candidates = [c for c in candidates
                       if (c.get("page_path") or "").endswith(slug_suffix)]
+    else:
+        # Free-text query mode: dedup identical-body chunks before the top-K cut
+        # so K distinct-content passages are returned (duplicate slugs consume only one slot).
+        candidates = dedup_by_body_hash(candidates)
 
     # Rerank
     if args.no_rerank or not candidates:
@@ -303,11 +332,17 @@ def main():
     else:
         query_label = effective_query
 
+    # Strip internal-only fields before serialising
+    clean_final = []
+    for c in final[:args.top]:
+        c.pop("_body_hash", None)
+        clean_final.append(c)
+
     out = {
         "query": query_label,
         "strategy": strategy,
         "top_k": args.top,
-        "candidates": final[:args.top],
+        "candidates": clean_final,
     }
     print(json.dumps(out, indent=2, ensure_ascii=False))
     return EXIT_OK

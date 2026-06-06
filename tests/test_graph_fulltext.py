@@ -1251,3 +1251,135 @@ class TestSlugDirFallback:
         assert "Direct MD" in body or "Body from direct path" in body, (
             "Fallback overwrote the direct-path resolution — priority bug"
         )
+
+
+# ============================================================================
+# Query-mode dedup: identical chunk body_hash -> only one result in top-K
+# ============================================================================
+
+class TestQueryDedup:
+    """Duplicate-slug dedup: two slugs sharing byte-identical chunk bodies must
+    appear only once in query results so a third distinct paper gets a top-K slot.
+
+    Covers only free-text query mode (args.query). --paper mode intentionally
+    returns multiple chunks of one paper — not touched.
+    """
+
+    def _build_index(self, tmp_path, papers: list[dict]) -> tuple:
+        """Sync a list of papers (slug, body) into a sandboxed index.
+
+        Returns (export_path, chunks_dir, bm25_dir).
+        """
+        paper_rows = []
+        for p in papers:
+            src = tmp_path / f"{p['slug']}.md"
+            src.write_text(p["body"], encoding="utf-8")
+            paper_rows.append({
+                "slug": p["slug"],
+                "source_path": str(src),
+                "arxiv_id": p.get("arxiv_id"),
+            })
+
+        fake_export = {
+            "papers": paper_rows,
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        chunks_dir = tmp_path / ".vault-meta" / "graph" / "chunks"
+        bm25_dir = tmp_path / ".vault-meta" / "graph" / "bm25"
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(chunks_dir),
+            "--bm25-dir", str(bm25_dir),
+        )
+        assert rc == 0, f"sync failed: exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+        return export_path, chunks_dir, bm25_dir, papers_out
+
+    def _retrieve(self, tmp_path, query: str, chunks_dir, bm25_dir, top: int = 5) -> list:
+        """Run graph-retrieve.py and return parsed candidates list."""
+        cmd = [
+            sys.executable, str(RETRIEVE_SCRIPT),
+            query,
+            "--bm25-index", str(bm25_dir / "index.json"),
+            "--chunks-dir", str(chunks_dir),
+            "--top", str(top),
+            "--no-rerank",
+        ]
+        r = subprocess.run(
+            cmd, capture_output=True, text=True,
+            cwd=PROJECT_ROOT, timeout=30,
+        )
+        assert r.returncode == 0, (
+            f"graph-retrieve.py exited {r.returncode}\n"
+            f"stdout: {r.stdout}\nstderr: {r.stderr}"
+        )
+        return json.loads(r.stdout).get("candidates", [])
+
+    def test_duplicate_slug_chunk_appears_once(self, tmp_path):
+        """Two slugs with byte-identical chunk-000 bodies -> only one occurrence in results.
+
+        Setup: slug A and slug B share identical body text (simulating an import
+        that created two slugs for the same paper). Slug C has a distinct body.
+        Query with top=3. Assert:
+          - The shared body text appears exactly once in candidates.
+          - Slug C appears in the top-3 (not pushed out by duplicate of A/B).
+        """
+        if not RETRIEVE_SCRIPT.exists():
+            pytest.skip("graph-retrieve.py not implemented")
+
+        shared_body = (
+            "# OmniVTON Training-Free Universal Virtual Try-On\n\n"
+            "This paper proposes a training-free approach to universal virtual try-on "
+            "using diffusion models with attention manipulation. The method achieves "
+            "state-of-the-art performance on VITON-HD and DressCode benchmarks without "
+            "any fine-tuning. Key contribution: zero-shot garment transfer via "
+            "cross-attention injection in diffusion U-Net."
+        )
+        distinct_body = (
+            "# Distinct Paper on 3D Garment Reconstruction\n\n"
+            "This paper presents a novel approach to 3D garment reconstruction "
+            "from single-view RGB images using implicit neural representations. "
+            "The method outperforms all baselines on the THuman dataset."
+        )
+
+        papers = [
+            {"slug": "omnivton-training-free-universal", "body": shared_body},
+            {"slug": "omnivton-training-free-universal-virtual-try-on", "body": shared_body},
+            {"slug": "distinct-3d-garment-reconstruction", "body": distinct_body},
+        ]
+        _, chunks_dir, bm25_dir, _ = self._build_index(tmp_path, papers)
+
+        candidates = self._retrieve(
+            tmp_path, "training-free virtual try-on diffusion garment",
+            chunks_dir, bm25_dir, top=3,
+        )
+
+        # Gather the snippet text of each candidate
+        snippets = [c.get("snippet", "") for c in candidates]
+
+        # The shared body's opening (first 200 chars used for snippet) must appear at most once
+        shared_opening = shared_body[:50]
+        shared_count = sum(1 for s in snippets if shared_opening in s)
+        assert shared_count <= 1, (
+            f"Duplicate chunk appeared {shared_count} times in top-3 results; "
+            f"expected at most 1. Candidates: {[c.get('chunk_id') for c in candidates]}"
+        )
+
+        # The distinct paper must appear in the top-3 (was being pushed out before fix)
+        distinct_present = any(
+            "distinct-3d-garment" in (c.get("page_path") or "")
+            or "distinct-3d-garment" in (c.get("chunk_id") or "")
+            for c in candidates
+        )
+        assert distinct_present, (
+            "Distinct paper was pushed out of top-3 by duplicate slugs. "
+            f"Candidates: {[c.get('chunk_id') for c in candidates]}"
+        )

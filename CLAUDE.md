@@ -2,8 +2,8 @@
 
 This folder is both a Claude Code plugin and an Obsidian vault.
 
-**Plugin name:** `claude-obsidian` (v1.7+ "Compound Vault" — see [docs/compound-vault-guide.md](docs/compound-vault-guide.md); v1.8+ adds methodology modes — see [docs/methodology-modes-guide.md](docs/methodology-modes-guide.md))
-**Skills:** `/wiki`, `/wiki-ingest`, `/wiki-query`, `/wiki-lint`, `/wiki-cli` (v1.7), `/wiki-retrieve` (v1.7, opt-in), `/wiki-mode` (v1.8)
+**Plugin name:** `claude-obsidian` (v1.7+ "Compound Vault" — see [docs/compound-vault-guide.md](docs/compound-vault-guide.md); v1.8+ adds methodology modes — see [docs/methodology-modes-guide.md](docs/methodology-modes-guide.md); v1.10+ adds the claim-graph fusion — see [docs/graphbuilding-fusion-design.md](docs/graphbuilding-fusion-design.md) and [docs/graphbuilding-fusion-migration-report.md](docs/graphbuilding-fusion-migration-report.md))
+**Skills:** `/wiki`, `/wiki-ingest`, `/wiki-query`, `/wiki-lint`, `/wiki-cli` (v1.7), `/wiki-retrieve` (v1.7, opt-in), `/wiki-mode` (v1.8), `/graph` (v1.10)
 **Vault path:** This directory (open in Obsidian directly)
 
 ## What This Vault Is For
@@ -61,6 +61,11 @@ Do NOT read the wiki for general coding questions or things already in this proj
 | `/wiki-retrieve` (v1.7) | Hybrid contextual + BM25 + cosine-rerank retrieval (opt-in via `bash bin/setup-retrieve.sh`) |
 | `/wiki-mode` (v1.8) | Methodology modes (LYT / PARA / Zettelkasten / Generic). Set via `bash bin/setup-mode.sh`; consumed by wiki-ingest / save / autoresearch for routing new pages |
 | `/think` (v1.9) | The 10-principle thinking loop (OBSERVE-OBSERVE-LISTEN-THINK-CONNECT-CONNECT-FEEL-ACCEPT-CREATE-GROW) as an invocable workflow. Apply to architectural decisions, audits, post-mortems, ambiguous user requests. Every other skill has a "How to think" appendix mapping this framework to its specific work |
+| `/graph` (v1.10) | Claim-centric knowledge graph (Graphbuilding Fusion). Build the derived index from `wiki/graph/` markdown, scan for the five research-gap species, or resolve duplicate entities. Markdown is the source of truth; sqlite is a derived/throwaway index. Scripts: `scripts/graph-{build,gaps,resolve,export}.py` + `graph_db.py`. Migrated natively from the standalone `graphbuilding` skill — verified lossless (see migration report) |
+
+## Claim Graph (v1.10+)
+
+`/graph` adds a claim-centric knowledge layer distinct from the prose page wiki. The atom is a typed `subject —predicate→ object` claim with polarity (asserts/refutes) and a replication/support count — enabling cross-paper agreement/refutation and five gap species (frontier / debate / replication / coverage / white-space) that no page organizer can represent. `wiki/graph/` markdown is the source of truth (git-tracked); `.vault-meta/graph/graph.db` is a derived, gitignored index rebuilt by `scripts/graph-build.py`. **`wiki/graph/entities/` (structured) is deliberately separate from `wiki/entities/` (prose) — do not merge them.** Entity resolution uses one shared `graph_db.root()`, never inline `COALESCE`. Tests: `make test-graph` (39 tests). Full evidence: [docs/graphbuilding-fusion-migration-report.md](docs/graphbuilding-fusion-migration-report.md).
 
 ## Transport (v1.7+)
 

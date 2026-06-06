@@ -17,7 +17,7 @@
 
 Claude + Obsidian knowledge companion and self-organizing AI second brain. A running AI notetaker that builds and maintains a persistent, compounding wiki vault. Every source you add gets integrated. Every question you ask pulls from everything that has been read. Knowledge compounds like interest.
 
-Open-source Obsidian AI plugin for AI note-taking, personal knowledge management (PKM), second-brain workflows, and a private Notion alternative. **15 Claude Code skills**, multi-agent support, multi-writer safe (v1.7+), first-class methodology modes (LYT / PARA / Zettelkasten / Generic via v1.8), and the 10-principle thinking framework (v1.9). Based on [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+Open-source Obsidian AI plugin for AI note-taking, personal knowledge management (PKM), second-brain workflows, and a private Notion alternative. **16 Claude Code skills**, multi-agent support, multi-writer safe (v1.7+), first-class methodology modes (LYT / PARA / Zettelkasten / Generic via v1.8), the 10-principle thinking framework (v1.9), and a native claim-centric knowledge graph with a five-species research-gap scanner (v1.10). Based on [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 
 > **Two ways to get this skill.** Pick the one that fits how you work.
 >
@@ -189,6 +189,9 @@ Then scaffold the full wiki structure.
 | `/canvas zone [name]` | Add a new labeled zone to organize visual content |
 | `/canvas from banana` | Capture recently generated images onto the canvas |
 | `/think [problem]` | Apply the 10-principle thinking loop to a non-trivial problem |
+| `/graph` | Claim-graph status; route to build / gaps / resolve (v1.10) |
+| `/graph gaps` | Scan the claim graph for the five research-gap species |
+| `/graph resolve` | Propose duplicate-entity merges for human review |
 | `lint the wiki` | Health check: orphans, dead links, gaps, suggestions |
 | `update hot cache` | Refresh hot.md with latest context summary |
 

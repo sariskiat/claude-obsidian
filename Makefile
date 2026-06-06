@@ -2,8 +2,8 @@
 # Test runner entry points for DragonScale and vault tooling.
 
 .PHONY: test test-address test-tiling test-boundary test-bm25 test-retrieve \
-        test-lock test-concurrent test-mode test-contextual setup-dragonscale \
-        setup-retrieve setup-mode clean-test-state help
+        test-lock test-concurrent test-mode test-contextual test-graph \
+        setup-dragonscale setup-retrieve setup-mode clean-test-state help
 
 help:
 	@echo "claude-obsidian developer targets:"
@@ -17,6 +17,7 @@ help:
 	@echo "  make test-concurrent  multi-writer correctness gate (shell, hermetic)"
 	@echo "  make test-mode        scripts/wiki-mode.py tests (python, hermetic)"
 	@echo "  make test-contextual  scripts/contextual-prefix.py cache-floor tests (python, hermetic)"
+	@echo "  make test-graph       graph fusion round-trip + gaps + resolve (uv, needs PyYAML+networkx)"
 	@echo "  make setup-dragonscale Run bin/setup-dragonscale.sh against this vault"
 	@echo "  make setup-retrieve   Run bin/setup-retrieve.sh against this vault (opt-in v1.7)"
 	@echo "  make setup-mode       Run bin/setup-mode.sh to pick a methodology mode (opt-in v1.8)"
@@ -61,6 +62,10 @@ test-mode:
 test-contextual:
 	@echo "=== test_contextual_prefix.py ==="
 	@python3 tests/test_contextual_prefix.py
+
+test-graph:
+	@echo "=== graph fusion: roundtrip + gaps + resolve (uv) ==="
+	@uv run python -m pytest tests/test_graph_roundtrip.py tests/test_graph_gaps.py tests/test_graph_resolve.py -q
 
 setup-dragonscale:
 	@bash bin/setup-dragonscale.sh

@@ -442,7 +442,7 @@
       "id": "graph-resolve-dedup",
       "title": "Entity Resolution + Embedding Dedup",
       "phase": "passing",
-      "status": "in_progress",
+      "status": "completed",
       "problem_classification": "unique",
       "problem_statement": "689 variant entities exist in the graph. Same concepts under different names fragment gap counts and weaken the knowledge graph.",
       "jtbd": "When I want to clean up duplicate entities, I need a tool that finds likely duplicates using exact matching and semantic similarity, ranks them by confidence, and presents them for human review.",

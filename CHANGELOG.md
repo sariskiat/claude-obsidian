@@ -2,6 +2,35 @@
 
 All notable changes to claude-obsidian. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
+## [1.10.0] - 2026-06-06 (Graphbuilding Fusion — native claim-centric knowledge graph)
+
+Fuses the standalone `graphbuilding` skill (formerly `~/.claude/skills/graphbuilding` over a scattered `~/.graphbuilding/graph.db` dotdir) **natively** into this repo. The claim — a typed, signed, quoted `subject —predicate→ object` proposition — becomes a first-class layer the page wiki could never represent: cross-paper agreement/refutation, replication counts, and the five research-gap species. Markdown under `wiki/graph/` is the source of truth; the sqlite index is derived and throwaway. Design: [`docs/graphbuilding-fusion-design.md`](docs/graphbuilding-fusion-design.md). Verification: [`docs/graphbuilding-fusion-migration-report.md`](docs/graphbuilding-fusion-migration-report.md).
+
+### Added
+
+- **`/graph` skill** (`skills/graph/SKILL.md`) + `/graph` command (`commands/graph.md`) — the user surface for the claim graph: build the index, scan for gaps, resolve duplicate entities, re-export. This is the 16th skill.
+- **Native engine** (`scripts/graph_db.py`, `graph-build.py`, `graph-export.py`, `graph-gaps.py`, `graph-resolve.py`) — zero imports from the oracle dotdir; reuses this repo's pytest harness and `rerank.py` embeddings.
+  - `graph_db.root()` — one path-compressing, cycle- and dangling-safe entity-resolution helper that replaces every inline `COALESCE(canonical_id, id)` (which was single-hop and wrong on chains). Shared by all five scripts.
+  - `graph-gaps.py` — native five-species scanner (frontier / debate / replication / coverage / white-space), `seed=42` deterministic Louvain.
+  - `graph-resolve.py` — two-tier entity dedup: exact-name (T1), embedding similarity via ollama nomic-embed (T2A), token-Jaccard fallback (T2B). Proposes only; a human confirms merges.
+- **`wiki/graph/`** structured markdown vault (98 papers, 1444 entities, 1052 claims) + `graph-export.json` portable snapshot (tracked) + `SCHEMA.md` frontmatter contract.
+- **`tests/test_graph_roundtrip.py` / `test_graph_gaps.py` / `test_graph_resolve.py`** — 39 tests; round-trip is the acceptance oracle (per-row `SELECT *` 9-table diff + 5-species gap diff through the independent oracle scanner + source-md5-untouched). `make test-graph` target added.
+
+### Verified
+
+- **Lossless migration**, confirmed against code the implementer never touched (the original `graphbuilding` `gaps.py` + raw SQL): all **9 tables byte-equal** to the live oracle DB (papers 98, sections 789, paper_authors 97, entities 1444, predicates 46, claims 1052, entity_edges 543, citation_links 0, **aliases 834** — the prior 834→779 drop is fixed), and **899 gaps reproduced exactly** (frontier 65, debate 0, replication 473, coverage 49, white-space 312) across all four scanner×DB combinations.
+
+### Changed
+
+- `.claude-plugin/plugin.json` + `marketplace.json` version 1.9.2 → 1.10.0; added `knowledge-graph` / `claim-graph` / `research-gaps` / `entity-resolution` keywords.
+- `pyproject.toml` adds PyYAML + networkx (graph deps) under `uv`; `.gitignore` ignores the derived `.vault-meta/graph/graph.db` (the `wiki/graph/` markdown + JSON snapshot are tracked), `.pytest_cache/`, and the local `.claude/` working dir.
+
+### Removed
+
+- `specs/graph-vault-migration.html` — redundant rendered duplicate of the tracked `.md` spec.
+
+---
+
 ## [1.9.2] - 2026-05-27 (prompt-cache hardening + path-handling robustness)
 
 Ports Anthropic prompt-caching best practices into the **one** place the plugin calls the Anthropic API directly: tier-1 contextual-prefix generation in `scripts/contextual-prefix.py`. Verified by full-repo sweep that `cache_control` and the Anthropic API surface exist nowhere else (incl. `claude-canvas/`). No change to retrieval output — API payload shape + observability only.

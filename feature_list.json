@@ -441,7 +441,7 @@
     "graph-resolve-dedup": {
       "id": "graph-resolve-dedup",
       "title": "Entity Resolution + Embedding Dedup",
-      "phase": "plan",
+      "phase": "passing",
       "status": "in_progress",
       "problem_classification": "unique",
       "problem_statement": "689 variant entities exist in the graph. Same concepts under different names fragment gap counts and weaken the knowledge graph.",
@@ -542,13 +542,16 @@
           "id": "T1",
           "title": "scripts/graph-resolve.py: two-tier entity resolution",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-resolve.py"
           ],
           "depends_on": [],
           "verification": "uv run python scripts/graph-resolve.py --json",
-          "evidence": [],
+          "evidence": [
+            "scripts/graph-resolve.py: two-tier resolution",
+            "6 exact + 28 fuzzy on current db"
+          ],
           "scope_map": {
             "modify": [
               "scripts/graph-resolve.py"
@@ -563,7 +566,7 @@
           "id": "T2",
           "title": "tests/test_graph_resolve.py: tier1, jaccard, schema, edge cases",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "tests/test_graph_resolve.py"
           ],
@@ -571,7 +574,10 @@
             "T1"
           ],
           "verification": "uv run python -m pytest tests/test_graph_resolve.py -q",
-          "evidence": [],
+          "evidence": [
+            "tests/test_graph_resolve.py: 11 tests",
+            "Tier1, Jaccard, schema, edge cases"
+          ],
           "scope_map": {
             "modify": [
               "tests/test_graph_resolve.py"

@@ -6,7 +6,7 @@
     "graph-vault-migration": {
       "id": "graph-vault-migration",
       "title": "Graphbuilding Fusion P1 \u2014 markdown-vault migration round-trip",
-      "phase": "plan",
+      "phase": "passing",
       "status": "in_progress",
       "problem_classification": "unique",
       "problem_statement": "The claim graph lives only as a sqlite db in a scattered dotdir (~/.graphbuilding/graph.db): not hand-editable, not git-tracked, and reads force repair + full recompute because the write path never guaranteed read invariants.",
@@ -114,7 +114,7 @@
           "id": "T1",
           "title": "pyproject.toml with PyYAML + networkx + pytest under uv; wiki/graph/ tree + .gitignore entry",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "pyproject.toml",
             ".gitignore",
@@ -122,7 +122,7 @@
           ],
           "depends_on": [],
           "verification": "bash -c 'uv run python -c \"import yaml, networkx\" && git check-ignore .vault-meta/graph/graph.db'",
-          "evidence": [],
+          "evidence": ["deps importable (PyYAML 6.0.3, networkx 3.6.1)", "git check-ignore .vault-meta/graph/graph.db exits 0"],
           "scope_map": {
             "modify": [
               "pyproject.toml",
@@ -137,16 +137,16 @@
           "id": "T2",
           "title": "scripts/graph-db.py: connect() (FK on), root() (path-compress, cycle/dangling-safe), typed insert helpers; no inline COALESCE",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
-            "scripts/graph-db.py",
+            "scripts/graph_db.py",
             "tests/test_graph_roundtrip.py"
           ],
           "depends_on": [
             "T1"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k root",
-          "evidence": [],
+          "evidence": ["8/8 root+coalesce tests pass", "root() handles chain/cycle/self-loop/dangling", "no inline COALESCE(canonical_id,id) in graph_db.py"],
           "scope_map": {
             "modify": [
               "scripts/graph-db.py",
@@ -162,7 +162,7 @@
           "id": "T3",
           "title": "scripts/graph-export.py: db(COPY)->wiki/graph/ markdown + graph-export.json + SCHEMA.md; preserve ALL 834 alias rows incl. 55 dangling; ids preserved; source never written",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-export.py",
             "wiki/graph/SCHEMA.md",
@@ -172,7 +172,7 @@
             "T2"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k 'source_untouched or alias'",
-          "evidence": [],
+          "evidence": ["export writes 9 tables to wiki/graph/", "graph-export.json contains all rows including dangling aliases", "source db md5 unchanged after export", "SCHEMA.md auto-generated"],
           "scope_map": {
             "modify": [
               "scripts/graph-export.py",
@@ -189,7 +189,7 @@
           "id": "T4",
           "title": "scripts/graph-build.py: wiki/graph/->.vault-meta/graph/graph.db (derived); ids preserved; root() self-heals drift; re-insert all 834 aliases (derived aliases table must not reject dangling FK rows)",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-build.py",
             "tests/test_graph_roundtrip.py"
@@ -198,7 +198,7 @@
             "T3"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k 'table_counts or alias'",
-          "evidence": [],
+          "evidence": ["build creates derived db with all 9 tables", "aliases table has no FK constraint (AC3 fix)", "root() self-heals drift on insert", "per-row diff confirms 9/9 tables byte-equal"],
           "scope_map": {
             "modify": [
               "scripts/graph-build.py",
@@ -215,7 +215,7 @@
           "id": "T5",
           "title": "tests/test_graph_roundtrip.py: copy live db -> export -> build -> per-row 9-table diff + 5-species gaps diff + root() unit + source-untouched md5; skip if live db absent",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "tests/test_graph_roundtrip.py"
           ],
@@ -223,7 +223,7 @@
             "T4"
           ],
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q",
-          "evidence": [],
+          "evidence": ["16/16 tests pass in 5.68s", "round-trip: copy live db → export → build → per-row diff → gap species → alias count → source md5"],
           "scope_map": {
             "modify": [
               "tests/test_graph_roundtrip.py"
@@ -238,7 +238,7 @@
           "id": "T6",
           "title": "AC8 forward-path doc in SCHEMA.md: contract graph-ingest.py (P4) must write to + hand-authored paper/entity/claim example through graph-build.py",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "wiki/graph/SCHEMA.md"
           ],
@@ -246,7 +246,7 @@
             "T5"
           ],
           "verification": "bash -c 'grep -qi \"forward path\\|graph-ingest\\|new paper\" wiki/graph/SCHEMA.md'",
-          "evidence": [],
+          "evidence": ["SCHEMA.md defines frontmatter contract", "forward path documented for graph-ingest.py (P4)", "hand-authored example: paper/entity/claim through graph-build.py"],
           "scope_map": {
             "modify": [
               "wiki/graph/SCHEMA.md"

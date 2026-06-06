@@ -22,3 +22,13 @@
 - Commits: 79b1bc5 feat(graph-vault-migration): T1-T4
 - Known risks: Subagent spawning broken with deepseek-v4-pro model (requires session restart with model: sonnet)
 - Next best action: Rebase onto develop, push, open MR for human review
+
+### 2026-06-06 (graph-full-paper-retrieval slug-dir fallback)
+- Goal: Add slug-dir fallback to resolver + re-sync 95 papers.
+- Completed:
+  - TDD: added TestSlugDirFallback (5 tests) — confirmed RED first, then GREEN after impl.
+  - scripts/graph-fulltext.py: _slug_dir_fallback() + PAPER_SCHOLAR_DIR env var + _paper_scholar_root(); resolver fallback fires last (after all source_path strategies).
+  - tests/test_graph_fulltext.py: _resolve_tier_a helper updated to mirror slug-dir fallback logic; TestSlugDirFallback class added.
+  - Data re-sync: uv run python scripts/graph-fulltext.py sync → 95 Tier-A resolved, 3 skipped (URL non-papers); 63 new .full.md committed.
+- Verification: make test-graph 44/44 passed, 4 skipped; make test-fulltext 35/35 passed; ls wiki/graph/papers/*.full.md | wc -l = 95.
+- Commit: 01a6479 feat(graph): slug-dir fallback in resolver + 63 new .full.md imports (95/98 total)

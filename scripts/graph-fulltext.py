@@ -156,6 +156,12 @@ def _resolve_source_path(source_path: str, slug: str = ""):
             return _slug_dir_fallback(slug)
         return None, "no_source_path"
     if source_path.startswith("http"):
+        # URL source_path — direct fetch not supported, but try slug-dir fallback
+        # before giving up (e.g. anthropic-kg-cookbook has content at PS slug dir)
+        if slug:
+            resolved, reason = _slug_dir_fallback(slug)
+            if resolved is not None:
+                return resolved, reason
         return None, "url"
     sp = Path(os.path.expanduser(source_path))
     # direct .md

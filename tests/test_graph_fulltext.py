@@ -116,6 +116,11 @@ def _resolve_tier_a(graph_export_data):
         slug = p["slug"]
         sp = p.get("source_path") or ""
         if sp.startswith("http"):
+            # URL source_path: try slug-dir fallback before giving up
+            cand = _slug_dir_candidate(slug)
+            if cand is not None:
+                tier_a.append({"slug": slug, "resolved_path": cand,
+                                "arxiv_id": p.get("arxiv_id")})
             continue
         if sp:
             sp_exp = Path(os.path.expanduser(sp))
@@ -419,6 +424,68 @@ class TestSkipBodyless:
         assert rc == 0, f"exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
         assert not (papers_out / "url-paper.full.md").exists(), (
             "URL paper should be skipped — no .full.md"
+        )
+
+    def test_url_source_path_with_slug_dir_writes_full_md(self, tmp_path):
+        """A paper whose source_path is a URL but whose slug has a matching
+        directory in PAPER_SCHOLAR_DIR with exactly one .md must get a .full.md
+        written via the slug-dir fallback — not skipped.
+
+        Regression: the resolver was short-circuiting on 'http' before attempting
+        the slug-dir fallback, so anthropic-kg-cookbook and multimodal-crop-tool
+        (URL source_paths that now have ~/.paper-scholar/<slug>/<slug>.md) were
+        silently skipped.
+        """
+        assert FULLTEXT_SCRIPT.exists(), "graph-fulltext.py must be implemented first"
+
+        slug = "url-with-slug-dir"
+        ps_dir = tmp_path / "ps"
+        slug_dir = ps_dir / slug
+        slug_dir.mkdir(parents=True)
+        md_file = slug_dir / f"{slug}.md"
+        md_file.write_text(
+            "# URL-With-Slug-Dir Paper\n\nFull body only reachable via slug dir.\n",
+            encoding="utf-8",
+        )
+
+        fake_export = {
+            "papers": [
+                {
+                    "slug": slug,
+                    "source_path": "https://example.com/x",
+                    "arxiv_id": None,
+                },
+            ],
+            "entities": [], "claims": [], "sections": [],
+            "paper_authors": [], "predicates": [], "entity_edges": [],
+            "citation_links": [], "aliases": [],
+        }
+        export_path = tmp_path / "graph-export.json"
+        export_path.write_text(json.dumps(fake_export), encoding="utf-8")
+        papers_out = tmp_path / "papers"
+        papers_out.mkdir()
+        meta_out = tmp_path / ".vault-meta" / "graph"
+        meta_out.mkdir(parents=True)
+
+        env = os.environ.copy()
+        env["PAPER_SCHOLAR_DIR"] = str(ps_dir)
+
+        rc, stdout, stderr = _run_sync(
+            "--export", str(export_path),
+            "--papers-dir", str(papers_out),
+            "--chunks-dir", str(meta_out / "chunks"),
+            "--bm25-dir", str(meta_out / "bm25"),
+            env=env,
+        )
+        assert rc == 0, f"exit {rc}\nstdout: {stdout}\nstderr: {stderr}"
+        full_md = papers_out / f"{slug}.full.md"
+        assert full_md.exists(), (
+            f"{slug}.full.md was NOT written — slug-dir fallback not reached for URL source_path.\n"
+            f"stdout={stdout}\nstderr={stderr}"
+        )
+        body = _body_after_frontmatter(full_md.read_text(encoding="utf-8"))
+        assert body.encode("utf-8") == md_file.read_bytes(), (
+            "Body of fallback .full.md is not byte-equal to source"
         )
 
     @pytest.mark.skipif(not GRAPH_EXPORT.exists(), reason="graph-export.json not found")

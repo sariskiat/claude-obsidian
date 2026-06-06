@@ -26,13 +26,19 @@
       ],
       "scope_map": {
         "modify": [
-          "scripts/graph-db.py",
+          "scripts/graph_db.py",
           "scripts/graph-export.py",
           "scripts/graph-build.py",
           "wiki/graph/SCHEMA.md",
+          "wiki/graph/papers/",
+          "wiki/graph/entities/",
+          "wiki/graph/claims/",
+          "wiki/graph/_graph/",
+          "wiki/graph/graph-export.json",
           "tests/test_graph_roundtrip.py",
           ".gitignore",
-          "pyproject.toml"
+          "pyproject.toml",
+          "uv.lock"
         ],
         "read_only": [
           "~/.graphbuilding/graph.db (COPY ONLY, never written)",
@@ -149,7 +155,7 @@
           "evidence": ["8/8 root+coalesce tests pass", "root() handles chain/cycle/self-loop/dangling", "no inline COALESCE(canonical_id,id) in graph_db.py"],
           "scope_map": {
             "modify": [
-              "scripts/graph-db.py",
+              "scripts/graph_db.py",
               "tests/test_graph_roundtrip.py"
             ],
             "read_only": [

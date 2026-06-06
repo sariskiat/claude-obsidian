@@ -113,6 +113,17 @@ from now on:
    rather than evaluated for removal. Cite specific candidate files where
    pruning might apply.
 
+7. **Claim-graph integrity** (v1.10+) — if the diff touches `scripts/graph-*.py`,
+   `scripts/graph_db.py`, or `wiki/graph/`, the engine must not be able to commit
+   drift (design §7). Run the read-only guard (non-mutating; no `--heal`):
+   `uv run python scripts/graph-build.py wiki/graph .vault-meta/graph/graph.db &&
+   uv run python scripts/graph-validate.py --json`. Any non-zero
+   dangling/chain/self-loop count → **BLOCKER** (a broken `root()`/merge re-introduced
+   the exact drift class from `graph-skill-debt.md`). Non-zero `orphan` (claim →
+   missing entity) → **HIGH**. Also grep the diff: any new `COALESCE(canonical_id`
+   in code (not docstrings) → **BLOCKER** — entity rollup must use the shared
+   `graph_db.root()`.
+
 ## Tier definitions
 
 | Tier | Bar |

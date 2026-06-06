@@ -100,6 +100,14 @@ never held the invariants the read path assumed. The native engine bakes them in
   extracted*; resolution happens at query time via `root()`, not by rewriting claims.
 - **FK-on everywhere**; the derived `aliases` table tolerates dangling-FK rows so the export
   is lossless (the 834-alias round-trip bug is fixed).
+- **Integrity guard** — `scripts/graph-validate.py` reports the four drift species
+  (dangling / chain / self-loop / orphan) and `--heal` fixes the pointer-drift class via
+  `root()` (never throws). The pre-commit `verifier` agent runs it as a read-only gate so
+  drift can never be committed.
+```bash
+uv run python scripts/graph-validate.py            # report (exit 1 if drift)
+uv run python scripts/graph-validate.py --heal     # fix in place, then re-report
+```
 
 ---
 

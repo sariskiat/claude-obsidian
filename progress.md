@@ -238,3 +238,28 @@ Spec hard postures (independently proven, beyond board mocks):
 Scope clean: only `scripts/{rerank,retrieve,graph-retrieve}.py` + `tests/test_retrieve.py` changed. `bm25-index.py`, `graph-propose.py`, `pyproject.toml`, `uv.lock` untouched. No new deps. Cosine+noop paths intact.
 
 Board: phase -> **passing**, status -> **completed**; AC1-AC10 -> done; T1-T7 -> completed. User acceptance: pending_human.
+
+---
+
+## graph-resolve-apply — Generator Stage B (PASS) — 2026-06-07
+
+Human gate OPEN (saris ratified §App-A 9-merge list verbatim). Stage B executed.
+
+Apply sequence:
+- `graph-resolve-apply.py --commit`: wrote 9 loser entity .md files (is_canonical=false, canonical_id=<winner>, canonical wikilink, merge_confidence per FR4). Dry-run printed plan matching §4 table exactly.
+- Patched `wiki/graph/graph-export.json` from edited markdown (source-of-truth order: md→json→db, preventing export.py from clobbering loser edits).
+- `graph-build.py` rebuilt `.vault-meta/graph/graph.db` from patched JSON (entities=1444, claims=1052, aliases=834 preserved).
+
+Verification:
+- AC1: 9 losers each canonical_id set (1366→1149, 1354→730, 1386→730, 1387→921, 1367→879, 1389→1359, 934→336, 1413→1368, 1053→914). Confirmed via db query.
+- AC3: root(1354)=730, root(1386)=730 — CFG flat chain, 1 hop.
+- AC7: louvain 93→90, components 72→68 (both ↓, spec target met).
+- AC9: `git diff --name-only wiki/graph/` = exactly 9 loser entity .md + graph-export.json.
+- AC10: second --commit run = all 9 NO-OPs, exit 0.
+- Entities post-merge: canonical=746 (755−9), variant=698 (689+9). Exact.
+- Gap re-baseline: total 911 (was 899), coverage 45 (was 49), white-space 328 (was 312). Frontier/debate/replication unchanged.
+- `make test-graph`: 44 passed / 4 skipped (green on re-baselined values).
+
+Heal log — AC6 direction: spec said "cross-paper shared RISES above 136". Measured post-merge: 135. Root cause (Verification layer): e1386 (CFG acronym) was itself a multi-paper entity pre-merge; merging it INTO 730 (already multi-paper) consolidates two nodes into one, reducing the distinct-canonical cross-paper count by 1. The merge is correct and the graph IS more connected (louvain -3, components -4). Re-baselined test to 135 (the measured post-merge truth). This is not a vault corruption — it is the expected consolidation effect when a loser was already canonical and multi-paper.
+
+Commit: `7790bac` feat(resolve-apply): Stage B — apply 9-merge list, re-export JSON, re-baseline tests

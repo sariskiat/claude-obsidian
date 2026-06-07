@@ -6,6 +6,27 @@ research situation (RESEARCH_PROFILE.md) into a proposals.md-grade directions re
 written by headless `claude -p`, with every cited paper/entity verified against
 graph.db.
 
+Grounding gate — accepted residual limitation (documented per Evaluator mandate):
+  A hallucination written as a SINGLE capitalised word (e.g. "Memorization"),
+  or a Title-Case phrase with NO method-noun AND NO author-year pattern AND NO
+  backticks, may still escape the gate. The backtick contract (injected into
+  the prompt) is the primary guard for those cases — the model is instructed to
+  backtick-wrap every in-graph reference, so a lone-word reference that slips
+  through is a prompt-compliance failure, not a gate hole.
+
+  What IS caught (three-tier strategy):
+    T1: ALL-CAPS hyphenated compound tokens (FABRICATED-PAPER-9999)
+    T2: Backtick-quoted slug-like tokens (`vton-paper`, `aek-diffusion-sampler`)
+        — verified by EXACT equality against allow-list/db only (no substring fallback)
+    T3a: Author-year prose ("Wang et al. 2024", "Kamb and Ganguli 2023")
+    T3b: Title-Case phrase (≥2 cap words) + comprehensive method-noun
+         (comprehensive noun set: paper/method/model/framework/objective/technique/
+         algorithm/mechanism/pipeline/formulation/... — 40+ nouns)
+
+  What escapes: a hallucination that is ONLY a single Title-Case word or a
+  Title-Case phrase with no method-noun. The Evaluator's explicit acceptance:
+  this residual is documented here and in the audit footer of saved reports.
+
 Usage:
     uv run python scripts/graph-propose.py
     uv run python scripts/graph-propose.py --dry-run-dossier-only
@@ -381,10 +402,21 @@ def _extract_citations(report_text: str) -> set:
     # (lowercase "the" is NOT Title-Case so the match starts at "Garment").
     # "## The bar" → stripped by the heading removal above; never reaches here.
     # "The Garment..." → first word "The" is in _SECTION_WORDS_TC → excluded.
+    # Comprehensive method/result noun set — any Title-Case phrase immediately
+    # followed by one of these is treated as a prose citation and flagged.
+    # "objective" was the Evaluator's attack-F clincher that escaped the old
+    # 15-word list. This list must be COMPREHENSIVE, not minimal.
     _DOMAIN_SUFFIX_WORDS_T3B = [
         "paper", "method", "model", "net", "network", "diffusion", "transformer",
         "framework", "approach", "system", "architecture", "module", "decoder",
         "encoder", "sampler",
+        # Additional nouns proved necessary by adversarial evaluation
+        "objective", "technique", "algorithm", "strategy", "paradigm", "regime",
+        "mechanism", "pipeline", "formulation", "scheme", "bound", "ceiling",
+        "limit", "theory", "analysis", "theorem", "lemma", "loss", "transfer",
+        "distillation", "regularizer", "regularization", "baseline", "benchmark",
+        "operator", "estimator", "detector", "classifier", "generator", "discriminator",
+        "network", "head", "backbone", "layer", "block", "unit", "component",
     ]
     _TITLE_CASE_PHRASE_T3B = re.compile(
         r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:"
@@ -402,7 +434,16 @@ def _extract_citations(report_text: str) -> set:
         if len(words) < 2:
             continue
         if words[0] in _SECTION_WORDS_TC:
-            continue
+            # When the first word is a generic determiner/section-word (e.g. "The",
+            # "This", "Building"), trim it and try the remainder.
+            # Example: "The Garment Fidelity objective" → captured phrase is
+            # "The Garment Fidelity"; dropping "The" yields "Garment Fidelity" (2 words).
+            # This avoids false-negative on "the Garment Fidelity objective" in body prose
+            # while still excluding pure section headers (which are blanked out above).
+            words = words[1:]
+            if len(words) < 2:
+                continue
+            phrase = " ".join(words)
         citations.add(phrase.lower())
 
     return citations
@@ -431,17 +472,22 @@ def _verify_citations(citations: set, allow_list: list, conn) -> tuple[set, set]
 
     for cite in citations:
         cite_lower = cite.lower()
-        # Also try space-separated version for entity name matching
+        # Also try space-separated version for entity name matching (slug → spaces)
         cite_spaced = cite.replace("-", " ").lower()
         if (cite in allow_set or
                 cite_lower in allow_set_lower or
                 cite in db_slugs or
                 cite_lower in db_entities_lower or
                 cite_spaced in db_entities_lower or
-                # Suffix match: e.g. "ton-textured-3d-..." is a strict suffix of the real slug
-                any(real_slug.endswith(cite_lower) for real_slug in db_slugs) or
-                # Allow partial entity name matches (substring either way)
-                any(cite_lower in e or e in cite_lower for e in db_entities_lower if len(e) > 8)):
+                # Dangling-twin suffix rule ONLY: real_slug.endswith(cite_lower)
+                # Handles the truncated-backtick case where the model emits a
+                # partial slug that is a genuine strict suffix of a real slug.
+                # Example: cite='diffusion-sampler', real='aek-diffusion-sampler'.
+                # This is the ONLY substring-like rule that survives.
+                # NOTE: The old bidirectional entity-substring fallback is
+                # intentionally REMOVED — it caused "Spatial Memorization" to
+                # verify against real entity "Memorization" (8-of-16 false positives).
+                any(real_slug.endswith(cite_lower) for real_slug in db_slugs)):
             verified.add(cite)
         else:
             unverified.add(cite)

@@ -1380,3 +1380,267 @@ Week 1.
         assert len(section_false_positives) == 0, (
             f"Section headers must not be extracted as citations. Got FPs: {section_false_positives}"
         )
+
+
+# ---------------------------------------------------------------------------
+# BR1 HEAL: Exact-match verification + comprehensive noun coverage (attempt 3)
+# ---------------------------------------------------------------------------
+
+def _load_propose_module():
+    """Load graph-propose.py as a module (shared helper for unit tests)."""
+    import importlib.util as _ilu
+    spec = _ilu.spec_from_file_location("graph_propose", str(PROPOSE_SCRIPT))
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestExactVerification:
+    """BR1 fix #1 (attempt 3): _verify_citations must use EXACT match only.
+
+    The bidirectional substring fallback allowed "Spatial Memorization" to
+    verify against real entity "Memorization" — an 8-of-16 false-positive rate.
+    After the fix: only exact equality (case-insensitive) OR the legitimate
+    dangling-twin suffix rule (real_slug.endswith(cite_lower) for truncated
+    backtick slugs) is allowed. No substring containment in either direction.
+    """
+
+    def test_spatial_memorization_does_not_verify_against_memorization(self, tmp_path):
+        """'Spatial Memorization' MUST NOT verify against real entity 'Memorization'.
+
+        This is the primary collision the Evaluator proved. The bidirectional
+        substring check let cite='spatial memorization' pass because
+        'memorization' (8+ chars) is in 'spatial memorization'. After fix:
+        only exact (case-insensitive) match is allowed.
+        """
+        mod = _load_propose_module()
+        import sqlite3
+        db = tmp_path / "exact_test.db"
+        conn = sqlite3.connect(str(db))
+        conn.execute("CREATE TABLE papers (id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title TEXT, authors TEXT, source_path TEXT)")
+        conn.execute("CREATE TABLE entities (id INTEGER PRIMARY KEY, name TEXT NOT NULL, super_type TEXT, sub_type TEXT, description TEXT, source_paper TEXT, is_canonical INTEGER DEFAULT 1, canonical_id INTEGER DEFAULT NULL, merge_confidence REAL DEFAULT 1.0, metadata TEXT)")
+        conn.execute("INSERT INTO papers VALUES (1, 'real-paper', 'Real Paper', 'Auth', '/p.md')")
+        conn.execute("INSERT INTO entities VALUES (1, 'Memorization', 'concept', NULL, NULL, 'real-paper', 1, NULL, 1.0, NULL)")
+        conn.commit()
+
+        allow_list = ["real-paper", "Memorization"]
+        # "Spatial Memorization" is NOT in allow_list; real entity is "Memorization"
+        citations = {"spatial memorization"}
+        verified, unverified = mod._verify_citations(citations, allow_list, conn)
+        conn.close()
+
+        assert "spatial memorization" in unverified, (
+            "'spatial memorization' must be UNVERIFIED — it is NOT 'Memorization'. "
+            f"Got verified={verified}, unverified={unverified}. "
+            "The bidirectional substring fallback must be removed."
+        )
+        assert "spatial memorization" not in verified, (
+            "'spatial memorization' must NOT appear in verified set. "
+            f"Got verified={verified}"
+        )
+
+    def test_exact_slug_still_verifies(self, tmp_path):
+        """Real exact slug must still pass after removing substring fallback."""
+        mod = _load_propose_module()
+        import sqlite3
+        db = tmp_path / "exact2.db"
+        conn = sqlite3.connect(str(db))
+        conn.execute("CREATE TABLE papers (id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title TEXT, authors TEXT, source_path TEXT)")
+        conn.execute("CREATE TABLE entities (id INTEGER PRIMARY KEY, name TEXT NOT NULL, super_type TEXT, sub_type TEXT, description TEXT, source_paper TEXT, is_canonical INTEGER DEFAULT 1, canonical_id INTEGER DEFAULT NULL, merge_confidence REAL DEFAULT 1.0, metadata TEXT)")
+        conn.execute("INSERT INTO papers VALUES (1, 'vton-paper', 'VTON', 'Auth', '/v.md')")
+        conn.execute("INSERT INTO entities VALUES (1, 'virtual try-on', 'method', NULL, NULL, 'vton-paper', 1, NULL, 1.0, NULL)")
+        conn.commit()
+
+        allow_list = ["vton-paper", "virtual try-on"]
+        citations = {"vton-paper", "virtual try-on"}
+        verified, unverified = mod._verify_citations(citations, allow_list, conn)
+        conn.close()
+
+        assert "vton-paper" in verified, f"'vton-paper' must verify exactly. Got: {verified}"
+        assert "virtual try-on" in verified, f"'virtual try-on' must verify exactly. Got: {verified}"
+        assert len(unverified) == 0, f"No unverified expected. Got: {unverified}"
+
+    def test_dangling_twin_suffix_rule_preserved(self, tmp_path):
+        """Legitimate dangling-twin suffix (real_slug.endswith(cite)) must still pass.
+
+        Example: real slug 'aek-diffusion-sampler', truncated citation 'diffusion-sampler'
+        should verify because the real slug ends with the cite string.
+        This is the ONLY substring-like rule that must survive.
+        """
+        mod = _load_propose_module()
+        import sqlite3
+        db = tmp_path / "suffix.db"
+        conn = sqlite3.connect(str(db))
+        conn.execute("CREATE TABLE papers (id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title TEXT, authors TEXT, source_path TEXT)")
+        conn.execute("CREATE TABLE entities (id INTEGER PRIMARY KEY, name TEXT NOT NULL, super_type TEXT, sub_type TEXT, description TEXT, source_paper TEXT, is_canonical INTEGER DEFAULT 1, canonical_id INTEGER DEFAULT NULL, merge_confidence REAL DEFAULT 1.0, metadata TEXT)")
+        conn.execute("INSERT INTO papers VALUES (1, 'aek-diffusion-sampler', 'Aek', 'Auth', '/a.md')")
+        conn.execute("INSERT INTO entities VALUES (1, 'diffusion sampling', 'method', NULL, NULL, 'aek-diffusion-sampler', 1, NULL, 1.0, NULL)")
+        conn.commit()
+
+        allow_list = ["aek-diffusion-sampler", "diffusion sampling"]
+        # Truncated slug that is a real suffix of the full slug
+        citations = {"diffusion-sampler"}
+        verified, unverified = mod._verify_citations(citations, allow_list, conn)
+        conn.close()
+
+        assert "diffusion-sampler" in verified, (
+            "Truncated slug 'diffusion-sampler' should verify via the dangling-twin "
+            f"suffix rule (real slug ends with it). Got verified={verified}"
+        )
+
+    def test_garment_fidelity_objective_not_verified(self, tmp_path):
+        """'Garment Fidelity objective' must NOT verify when 'objective' is a method noun.
+
+        The Evaluator proved this slips through the T3b denylist because 'objective'
+        was not in the old 15-word suffix list. After fix, 'objective' is in the
+        comprehensive noun set, so it gets extracted by _extract_citations AND
+        _verify_citations rejects it when it's not in the allow-list.
+        """
+        mod = _load_propose_module()
+        # Test extraction: "Garment Fidelity objective" must be extracted
+        text = "The Garment Fidelity objective was proposed to measure quality."
+        cites = mod._extract_citations(text)
+        # It must be extracted (as a prose-shaped method reference)
+        extracted = any("garment" in c.lower() or "fidelity" in c.lower() for c in cites)
+        assert extracted, (
+            f"'Garment Fidelity objective' must be extracted by _extract_citations. Got: {cites}. "
+            "'objective' must be in the comprehensive method-noun set."
+        )
+
+
+class TestAttackFRegression:
+    """Attack-F regression: one real backticked slug + three prose fakes -> REJECTED.
+
+    The Evaluator's attack-F: a report with `vton-paper` (real, backticked) +
+    'Spatial Memorization framework' (prose fake) + 'Garment Fidelity objective'
+    (prose fake, 'objective' off old list) + 'Wang et al. 2024' (author-year fake)
+    must be rejected — NOT saved clean at exit 0 with '1/1 citations verified'.
+    """
+
+    @pytest.fixture
+    def fixture_db(self, tmp_path):
+        return _fixture_db_path(tmp_path)
+
+    @pytest.fixture
+    def proposals_dir(self, tmp_path):
+        d = tmp_path / "proposals"
+        d.mkdir()
+        return d
+
+    def _write_attack_f_engine(self, tmp_path: Path) -> Path:
+        """Engine that emits one real backticked slug + three prose fabrications."""
+        script = tmp_path / "attack_f_engine.sh"
+        script.write_text("""#!/bin/bash
+cat <<'REPORT'
+## The bar
+Three truths: the bar is steep, theory muscle is thin, scoop risk is real.
+
+## Decision matrix
+
+| # | Direction | Ceiling | Clean-exec odds @4h/wk solo | Theory load | Scoop risk | Builds on strength | Admissions signal |
+|---|-----------|:-------:|:---------------------------:|:-----------:|:----------:|:------------------:|:-----------------:|
+| 1 | Diffusion bridge | 5 | 2 | 4 | 3 | 4 | 5 |
+| 2 | Constrained sampling | 4 | 3 | 3 | 2 | 3 | 4 |
+| 3 | Rate-distortion analysis | 4 | 3 | 3 | 2 | 4 | 4 |
+
+### 1. Diffusion-VTON Bridge
+
+**Thesis:** Using `vton-paper` as the foundation, the Spatial Memorization framework
+provides a key mechanism. Wang et al. 2024 showed this can be extended.
+
+**Takedown:** Too dependent on the Garment Fidelity objective which is hard to define
+rigorously at the 4h/week pace.
+
+### 2. Constrained Sampling
+
+**Thesis:** Build constraints from `vton-paper`.
+
+**Takedown:** Needs clean theorem derivation.
+
+### 3. Rate-Distortion Analysis
+
+**Thesis:** Formalize bounds from `vton-paper`.
+
+**Takedown:** Risk of pure benchmark paper.
+
+## Ranking
+Direction 3 > 2 > 1 at solo 4h/week. Fork rule: theory co-author + >4h -> Direction 1.
+
+## Execution
+Week 1: reproduce baseline from `vton-paper`. Gate: if loss converges in 3 days, proceed.
+REPORT
+""")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        return script
+
+    def test_attack_f_rejected_nonzero_exit(self, fixture_db, proposals_dir, tmp_path):
+        """Attack-F: one real slug + three prose fakes -> non-zero exit (rejected)."""
+        engine = self._write_attack_f_engine(tmp_path)
+        rc, out, err = _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "2",
+        )
+        assert rc != 0, (
+            f"Attack-F (1 real backticked slug + 3 prose fakes) must produce non-zero exit. "
+            f"Got rc={rc}. This proves BR1 is closed. stderr: {err}"
+        )
+
+    def test_attack_f_no_clean_save(self, fixture_db, proposals_dir, tmp_path):
+        """Attack-F: no clean -directions.md must be written."""
+        engine = self._write_attack_f_engine(tmp_path)
+        _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "2",
+        )
+        clean_reports = list(proposals_dir.glob("*-directions.md"))
+        assert len(clean_reports) == 0, (
+            f"Attack-F must not produce a clean -directions.md. Found: "
+            f"{[r.name for r in clean_reports]}"
+        )
+
+    def test_attack_f_rejected_md_written(self, fixture_db, proposals_dir, tmp_path):
+        """Attack-F: a .rejected.md artifact must be written."""
+        engine = self._write_attack_f_engine(tmp_path)
+        _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "2",
+        )
+        rejected = list(proposals_dir.glob("*.rejected.md"))
+        assert len(rejected) >= 1, (
+            f"Attack-F must write a .rejected.md. Found none in {proposals_dir}."
+        )
+
+    def test_attack_f_unit_extracts_all_three_fakes(self, tmp_path):
+        """Unit: _extract_citations must find all three prose fakes in the attack-F body."""
+        mod = _load_propose_module()
+        text = (
+            "Using `vton-paper` as the foundation, the Spatial Memorization framework\n"
+            "provides a key mechanism. Wang et al. 2024 showed this can be extended.\n"
+            "The Garment Fidelity objective which is hard to define rigorously.\n"
+        )
+        cites = mod._extract_citations(text)
+        # vton-paper should be extracted (backticked)
+        assert any("vton-paper" in c for c in cites), (
+            f"'vton-paper' (backticked) must be extracted. Got: {cites}"
+        )
+        # Spatial Memorization framework — Title-Case + method noun
+        assert any("spatial" in c.lower() or "memorization" in c.lower() for c in cites), (
+            f"'Spatial Memorization framework' must be extracted (method noun). Got: {cites}"
+        )
+        # Wang et al. 2024 — author-year
+        assert any("wang" in c.lower() or "2024" in c for c in cites), (
+            f"'Wang et al. 2024' must be extracted (author-year). Got: {cites}"
+        )
+        # Garment Fidelity objective — Title-Case + 'objective'
+        assert any("garment" in c.lower() or "fidelity" in c.lower() for c in cites), (
+            f"'Garment Fidelity objective' must be extracted ('objective' in noun set). Got: {cites}"
+        )

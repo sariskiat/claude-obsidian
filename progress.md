@@ -164,3 +164,19 @@ Dir hygiene: `git rm` 3 stale tracked reports (`directions.md`, `-2.md`, `-3.md`
 Documented residual: a hallucination written as a SINGLE Title-Case word or a Title-Case phrase with no method-noun AND no author-year AND no backticks may still escape. Backtick contract is the primary guard. Documented in script docstring.
 
 **Task graph-semantic-bridge → awaiting Evaluator (evidence: 46 tests green, attack-F rejected, 7/7 live, dir clean)**
+
+## 2026-06-07 — Evaluator #3 (FINAL, retry 3/3): graph-semantic-bridge → PASS
+
+BR1 closed and verified by REAL /tmp fake-engine probes (not self-report).
+
+- **Attack F rejected**: 1 real backtick slug + `Spatial Memorization framework` + `Garment Fidelity objective` + `Wang et al. 2024` → exit 2, `.rejected.md`, NO clean save. (Eval#2 clean-saved this exact payload as `1/1 verified ✓` — the regression that capped twice is now closed.)
+- **Substring collisions closed** (the eval#2 root cause): `spatial memorization` (embeds real entity `Memorization`), `latent diffusion steering`, `adaptive memorization regularizer` → all flagged unverified, exit 2. The bidirectional substring fallback is gone; `_verify_citations` (graph-propose.py:487-490) is exact-match + dangling-twin `real_slug.endswith(cite)` only.
+- **Coverage**: method-noun list 15→51; all method-noun shapes caught (objective/approach/framework/regularizer/mechanism); both author-year shapes (`et al.`/`and`) caught.
+- **Residual characterized honestly**: only a Title-Case phrase whose adjacent noun is OFF the 51-word list (e.g. `Neural Tangent Kernel governs…`, kernel/manifold/bottleneck) OR a bare single capitalized word slips. This matches the Generator's documented residual exactly ("single Title-Case word / Title-Case phrase with no method-noun, no author-year, no backtick"); nothing wider slips. Guarded by the backtick prompt contract.
+- **Gate not over-rejecting**: clean-accept (all-real cites) → exit 0, clean save `2/2 verified`; dirty-retry-then-cap (`--retries 2`) → 3 attempts logged, exit 2, rejected.
+- **Live `directions-4.md`**: 28/28 backtick tokens resolve to real `papers.slug`/`entities.name`; structurally complete (`## The bar`, `## Decision matrix` table, 5 `### N.` blocks each with a Takedown, `## Ranking`, `## Execution`); genuinely harsh proposals.md-grade doc — NOT a thin shell despite 7 audited citations.
+- **Suites**: propose 46, test-graph 44/4, test-fulltext 45, test-bridge 26. AC1-7,10 exact cmds exit 0; AC8 green; AC9 exit 0. All 10 ACs done.
+- **Integrity**: crux read-only files (graph-bridge/graph-retrieve/graph-build/graph_db) byte-unchanged (0-diff since graph-bridge complete); no `fork/feature/graph-semantic-bridge` ref; oracle `~/Desktop/research/proposals.md` mtime Jun 5 (untouched). Proposals dir = exactly one clean tracked report.
+- Minor (non-blocking): `graph-fulltext.py` +6 lines (slug-dir fallback) sits outside `scope_map.modify` but pre-dates heal-3 and is covered by the green `test-fulltext` 45 baseline; not a crux file.
+
+**Verdict: PASS.** Board → phase=passing, status=completed. Git note `grade: pass` on `bcf165f`. Human MR.

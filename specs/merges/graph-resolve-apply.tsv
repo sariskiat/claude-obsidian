@@ -1,0 +1,14 @@
+# graph-resolve-apply.tsv — vetted merge list (App-A from specs/graph-resolve-apply.md)
+# Generated 2026-06-07 from self-grill. Human ratification required before --commit (Stage B).
+# Format: loser_id<TAB>winner_id<TAB>reason
+# 9 distinct loser->winner merges from 8 proposal rows.
+# Winner = max claim-degree; tie -> min id (spec §4).
+1366	1149	AnyDoor exact-name duplicate (T1): zero-shot object insertion baseline; 1149 higher degree
+1354	730	Classifier-Free Guidance exact-name duplicate (T1): 730 higher degree (6 vs 2)
+1386	730	Classifier-Free Guidance (CFG) fuzzy synonym (T2, J=0.833): CFG acronym gloss; flat chain into 730 group winner
+1387	921	Cross-Attention Conditioning exact-name duplicate (T1): 921 higher degree (4 vs 1)
+1367	879	DINOv2 exact-name duplicate (T1/T2-deduped): same pretrained vision encoder; 879 higher degree (1 vs 0)
+1389	1359	MSE Diffusion Loss exact-name duplicate (T1/T2-deduped): same training objective; tie->min-id 1359
+934	336	Stable Diffusion exact-name duplicate (T1): same T2I model; 336 higher degree (2 vs 1)
+1413	1368	CLIP=CLIP Vision Encoder fuzzy synonym (T2, J=0.833): CLIP image tower is the encoder; tie->min-id 1368
+1053	914	Virtual Fashion Try-On=Virtual Try-On fuzzy synonym (T2, J=0.714): Fashion is redundant qualifier; 914 far higher degree (15 vs 1)

@@ -1957,8 +1957,8 @@
     "graph-resolve-apply": {
       "id": "graph-resolve-apply",
       "title": "Apply Safe Entity-Resolution Merges (connect the islands)",
-      "status": "in_progress",
-      "phase": "validate",
+      "status": "completed",
+      "phase": "passing",
       "problem_classification": "unique",
       "problem_statement": "The Obsidian graph shows ~93 paper-islands. Only 136 of 755 canonical entities span >1 paper; duplicates were detected by P3's resolve.py but never merged. Until something writes the canonical_id pointers, every re-export reproduces the same fragmented graph and the five gap species under-count.",
       "jtbd": "When the resolver has surfaced duplicate entities, I want to commit the ones I trust (fold each duplicate into its canonical twin so two papers that used different names for the same thing share one graph node), so I can turn 93 disconnected islands into a connected research map for cross-paper agreement/debate/white-space analysis.",
@@ -2082,9 +2082,10 @@
           "criterion": "STAGE B. Cross-paper shared entities RISES above the pre-merge baseline (136).",
           "verification": "uv run python -c \"import sqlite3,sys; sys.path.insert(0,'scripts'); from graph_db import root; from collections import defaultdict; c=sqlite3.connect('.vault-meta/graph/graph.db'); p=defaultdict(set); [ (p[root(c,s,compress=False)].add(sp), p[root(c,o,compress=False)].add(sp)) for s,o,sp in c.execute('SELECT subject_entity_id,object_entity_id,source_paper FROM claims') ]; n=sum(1 for ps in p.values() if len(ps)>1); assert n>136, n\"",
           "stage": "B",
-          "status": "deviation",
+          "status": "done",
           "evidence": [
-            "FAIL AS STATED, ACCEPTED as correct-merge artifact. Measured cross-paper shared = 135 (spec asserts >136; a decrease of 1). PROVEN benign by mechanical trace: e1386 was multi-paper pre-merge (11 distinct papers), e730 also multi-paper (5 papers), both same concept (Classifier-Free Guidance/Method). Post-merge 730 absorbs union = 17 papers, 1386's 11 papers a STRICT SUBSET (zero claims dropped: claims 1052=1052, edges 543=543). Two multi-paper roots correctly collapsed into one richer one => distinct multi-paper COUNT -1 while connectivity improves. Metric proxy mis-specified for the multi-paper-loser case. CONDUCTOR MUST take this metric-spec deviation to the human before final sign-off."
+            "FAIL AS STATED, ACCEPTED as correct-merge artifact. Measured cross-paper shared = 135 (spec asserts >136; a decrease of 1). PROVEN benign by mechanical trace: e1386 was multi-paper pre-merge (11 distinct papers), e730 also multi-paper (5 papers), both same concept (Classifier-Free Guidance/Method). Post-merge 730 absorbs union = 17 papers, 1386's 11 papers a STRICT SUBSET (zero claims dropped: claims 1052=1052, edges 543=543). Two multi-paper roots correctly collapsed into one richer one => distinct multi-paper COUNT -1 while connectivity improves. Metric proxy mis-specified for the multi-paper-loser case. CONDUCTOR MUST take this metric-spec deviation to the human before final sign-off.",
+            "HUMAN-RATIFIED 2026-06-07 (saris, 'Accept & finish'): the cross-paper-shared count is accepted as a MIS-SPECIFIED PROXY for multi-paper merges, NOT a failure. 136\u2192135 is the correct arithmetic of fusing two already-multi-paper CFG canonical entities into one richer node (e1386 11-paper + e730 5-paper = 17-paper union, e1386 papers a strict subset, zero claims/edges dropped). The real metric of record is connectivity: components 72\u219268 and louvain 91\u219290 both genuinely dropped (islands down) with zero data loss. AC6 closed as done (proxy artifact, human-accepted)."
           ]
         },
         {
@@ -2381,8 +2382,8 @@
         }
       ],
       "validation": {
-        "user_acceptance": "pending_human (AC6 metric-spec deviation must be ratified before final sign-off)",
-        "business_metric": "MIXED (measured by Evaluator, rebuilt db): islands DROPPED genuinely (louvain 91->90, components 72->68) \u2014 primary goal MET; variants 689->698, canonical 755->746, claims 1052 unchanged (no loss). BUT cross-paper-shared 136->135 (AC6 stated direction violated) \u2014 proven a correct-merge artifact of folding two multi-paper CFG duplicates (e1386 11-paper + e730 5-paper) into one 17-paper node, not a bug. Pending human ratification of the AC6 metric-spec deviation."
+        "user_acceptance": "accepted (human ratified AC6 proxy-artifact deviation 2026-06-07; cross-paper count 135 accepted, connectivity \u2193 is the real metric of record)",
+        "business_metric": "met: islands dropped (louvain 91\u219290, components 72\u219268) with zero data loss (claims 1052 unchanged, edges 543 unchanged). AC6 cross-paper-shared 136\u2192135 is a correct-merge artifact of folding two multi-paper CFG duplicates (e1386 11-paper + e730 5-paper into one 17-paper node), human-ratified 2026-06-07 as a mis-specified proxy; connectivity is the metric of record. 9 merges correct, fully reversible."
       },
       "learning": {
         "technical": [

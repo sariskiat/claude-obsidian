@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
-  "current_feature": "wiki-rerank-claude",
+  "current_feature": "graph-resolve-apply",
   "wip_limit": 1,
   "features": {
     "graph-vault-migration": {
       "id": "graph-vault-migration",
-      "title": "Graphbuilding Fusion P1 \u2014 markdown-vault migration round-trip",
+      "title": "Graphbuilding Fusion P1 — markdown-vault migration round-trip",
       "phase": "passing",
       "status": "completed",
       "problem_classification": "unique",
@@ -74,7 +74,7 @@
         },
         {
           "id": "AC2",
-          "text": "5 gap species exact across the round-trip (frontier 65, debate 0, replication 473, coverage 49, white-space 312; total 899) \u2014 requires networkx for Louvain(seed=42)",
+          "text": "5 gap species exact across the round-trip (frontier 65, debate 0, replication 473, coverage 49, white-space 312; total 899) — requires networkx for Louvain(seed=42)",
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q -k gap_species",
           "expected_exit": 0
         },
@@ -248,7 +248,7 @@
           "verification": "uv run python -m pytest tests/test_graph_roundtrip.py -q",
           "evidence": [
             "16/16 tests pass in 5.68s",
-            "round-trip: copy live db \u2192 export \u2192 build \u2192 per-row diff \u2192 gap species \u2192 alias count \u2192 source md5"
+            "round-trip: copy live db → export → build → per-row diff → gap species → alias count → source md5"
           ],
           "scope_map": {
             "modify": [
@@ -289,11 +289,11 @@
     },
     "graph-native-gaps": {
       "id": "graph-native-gaps",
-      "title": "Native Gap Scanner \u2014 replace oracle gaps.py with repo-native analytics",
+      "title": "Native Gap Scanner — replace oracle gaps.py with repo-native analytics",
       "phase": "passing",
       "status": "completed",
       "problem_classification": "unique",
-      "problem_statement": "The 5-species gap scanner lives in the oracle dotdir (~/.claude/skills/graphbuilding/scripts/gaps.py), uses broken COALESCE(canonical_id,id) for entity resolution, and is not in this repo \u2014 it cannot evolve with the vault.",
+      "problem_statement": "The 5-species gap scanner lives in the oracle dotdir (~/.claude/skills/graphbuilding/scripts/gaps.py), uses broken COALESCE(canonical_id,id) for entity resolution, and is not in this repo — it cannot evolve with the vault.",
       "jtbd": "When I scan my claim graph for research gaps, I want a native gap scanner in this repo that uses root() (not broken COALESCE), runs on the derived db, and produces identical results to the oracle, so the analytics engine lives with the vault and evolves with it.",
       "user_context": "Single-tenant fork owner (saris). Phase 2 of the graphbuilding-fusion epic.",
       "spec_file": "specs/graph-native-gaps.md",
@@ -330,7 +330,7 @@
         "baseline": "oracle on derived db: 899 total (65/0/473/49/312)",
         "target": "native on derived db: 899 total (65/0/473/49/312)",
         "direction": "binary_pass",
-        "user_value_check": "identical gap counts mean the native scanner is a drop-in replacement \u2014 the analytics engine now lives in the repo",
+        "user_value_check": "identical gap counts mean the native scanner is a drop-in replacement — the analytics engine now lives in the repo",
         "how_measured": "uv run python -m pytest tests/test_graph_gaps.py -q",
         "keep_revert_rule": "keep only if all gap counts match oracle exactly; revert otherwise",
         "simplicity_criterion": "one shared graph_db.root() for entity resolution, no oracle imports"
@@ -350,7 +350,7 @@
         },
         {
           "id": "AC3",
-          "text": "Uses graph_db.root() \u2014 no COALESCE(canonical_id, id) anywhere",
+          "text": "Uses graph_db.root() — no COALESCE(canonical_id, id) anywhere",
           "verification": "bash -c \"grep -c COALESCE scripts/graph-gaps.py; test $? -eq 1\"",
           "expected_exit": 0
         },
@@ -374,7 +374,7 @@
         },
         {
           "id": "AC7",
-          "text": "Derived db missing \u2192 exit 1",
+          "text": "Derived db missing → exit 1",
           "verification": "bash -c \"uv run python scripts/graph-gaps.py --db /nonexistent 2>&1; test $? -eq 1\"",
           "expected_exit": 0
         },
@@ -461,7 +461,8 @@
         "graph-native-gaps"
       ],
       "blocks": [
-        "graph-full-paper-retrieval"
+        "graph-full-paper-retrieval",
+        "graph-resolve-apply"
       ],
       "scope_map": {
         "modify": [
@@ -475,7 +476,7 @@
           "wiki/graph/",
           "pyproject.toml"
         ],
-        "metric": "number of real duplicate entity pairs found (qualitative \u2014 human validates)"
+        "metric": "number of real duplicate entity pairs found (qualitative — human validates)"
       },
       "metric": {
         "name": "duplicate_detection",
@@ -512,7 +513,7 @@
         },
         {
           "id": "AC5",
-          "text": "No COALESCE \u2014 uses root()",
+          "text": "No COALESCE — uses root()",
           "verification": "bash -c \"grep COALESCE scripts/graph-resolve.py; test $? -eq 1\"",
           "expected_exit": 0
         },
@@ -751,7 +752,7 @@
       "tasks": [
         {
           "id": "T1",
-          "title": "TDD: tests/test_graph_fulltext.py \u2014 failing tests first for resolver/import (byte-equal body + contract frontmatter), skip-bodyless reporting, idempotent re-run, and gitignore (AC1,AC2,AC6,AC7). Use a tmp sandbox + monkeypatch of graph chunk/bm25 dirs; skip live-source/ollama-gated cases.",
+          "title": "TDD: tests/test_graph_fulltext.py — failing tests first for resolver/import (byte-equal body + contract frontmatter), skip-bodyless reporting, idempotent re-run, and gitignore (AC1,AC2,AC6,AC7). Use a tmp sandbox + monkeypatch of graph chunk/bm25 dirs; skip live-source/ollama-gated cases.",
           "agent": "tildi-generator",
           "status": "completed",
           "files": [
@@ -805,7 +806,7 @@
         },
         {
           "id": "T3",
-          "title": ".gitignore: add .vault-meta/graph/chunks/ and .vault-meta/graph/bm25/ (graph-scoped derived index, throwaway) \u2014 keep wiki/graph/papers/*.full.md tracked. Makes T1 gitignore test (AC7) green.",
+          "title": ".gitignore: add .vault-meta/graph/chunks/ and .vault-meta/graph/bm25/ (graph-scoped derived index, throwaway) — keep wiki/graph/papers/*.full.md tracked. Makes T1 gitignore test (AC7) green.",
           "agent": "tildi-generator",
           "status": "completed",
           "files": [
@@ -875,7 +876,7 @@
           "evidence": [
             "scripts/graph-retrieve.py: BM25+rerank backend, <query>/--paper/--claim, provenance, EXIT_NOT_PROVISIONED",
             "TestDegrade + TestReadSurface tests green (all 30 tests pass)",
-            "degrade/read_surface tests were written skipped before impl \u2014 confirmed RED (commit 8ce93bf)"
+            "degrade/read_surface tests were written skipped before impl — confirmed RED (commit 8ce93bf)"
           ],
           "scope_map": {
             "modify": [
@@ -956,7 +957,7 @@
       },
       "learning": {
         "technical": [
-          "Duplicate graph slugs can point at the same source paper (665 shared body_hashes live): free-text query must dedup by body_hash and --paper/--claim must direct-load via deterministic sha1('graph:<slug>')[:6] address rather than BM25-rank the slug \u2014 both fixed post-plan and tested",
+          "Duplicate graph slugs can point at the same source paper (665 shared body_hashes live): free-text query must dedup by body_hash and --paper/--claim must direct-load via deterministic sha1('graph:<slug>')[:6] address rather than BM25-rank the slug — both fixed post-plan and tested",
           "BM25 index idempotency is byte-equal only after excluding the updated_at timestamp field; the substantive index is deterministic"
         ],
         "product": [],
@@ -967,17 +968,17 @@
       }
     },
     "graph-bridge": {
-      "title": "Proposal Finder \u2014 graph-bridge.py (ranked, grounded white-space bridge proposals)",
+      "title": "Proposal Finder — graph-bridge.py (ranked, grounded white-space bridge proposals)",
       "status": "completed",
       "phase": "passing",
       "problem_statement": "The graph can name white-space gaps (community pairs with zero claim-edges) but cannot turn them into ranked, justified next-paper proposals, so the analysis stops short of the research output it exists to serve.",
       "jtbd": "When I see white-space in my claim graph, I want a ranked shortlist of justified bridge proposals grounded in the real papers, so I can pick my next paper's contribution instead of eyeballing 116 gaps.",
       "problem_classification": "unique",
-      "user_context": "saris (single-tenant fork owner), asleep; built autonomously under an explicit 'skip grill + keep stress testing until it works' directive. macOS, uv Python 3.12, /graph skill, derived db at .vault-meta/graph/graph.db. Awaiting human ratification on wake \u2014 nothing pushed or merged.",
+      "user_context": "saris (single-tenant fork owner), asleep; built autonomously under an explicit 'skip grill + keep stress testing until it works' directive. macOS, uv Python 3.12, /graph skill, derived db at .vault-meta/graph/graph.db. Awaiting human ratification on wake — nothing pushed or merged.",
       "spec_file": "specs/graph-bridge.md",
       "spec_status": "approved",
       "approval": {
-        "approved_by": "saris (delegated, pre-authorized) \u2014 ratify on wake",
+        "approved_by": "saris (delegated, pre-authorized) — ratify on wake",
         "date": "2026-06-06"
       },
       "depends_on": [
@@ -1269,20 +1270,20 @@
       },
       "learning": {
         "technical": [
-          "graph-bridge reconstructs the seed=42 Louvain clustering identically to graph-gaps (canonical nodes via graph_db.root, weighted claim edges) rather than recomputing differently \u2014 verified the live gold anchor ranks #1, which only holds if the substrate matches.",
-          "Ranking determinism (BR2) is byte-identical across runs; --synthesize output is NOT deterministic because it shells out to live `claude -p` (claude-cli tier) \u2014 that is intended opt-in egress per FR5, not an AC, so non-identical synthesize md5 is correct behavior."
+          "graph-bridge reconstructs the seed=42 Louvain clustering identically to graph-gaps (canonical nodes via graph_db.root, weighted claim edges) rather than recomputing differently — verified the live gold anchor ranks #1, which only holds if the substrate matches.",
+          "Ranking determinism (BR2) is byte-identical across runs; --synthesize output is NOT deterministic because it shells out to live `claude -p` (claude-cli tier) — that is intended opt-in egress per FR5, not an AC, so non-identical synthesize md5 is correct behavior."
         ],
         "product": [
-          "FR7 flags-not-drops: 8 of top-100 carry already_proposed=true (endpoints touch a hand-written bridge entity) and remain ranked \u2014 the user still sees them, which is the point."
+          "FR7 flags-not-drops: 8 of top-100 carry already_proposed=true (endpoints touch a hand-written bridge entity) and remain ranked — the user still sees them, which is the point."
         ],
         "process": [
-          "Evaluator proved zero-egress on the default path empirically by placing a failing `claude` shim first on PATH and confirming it never fired \u2014 stronger evidence than reading the args.synthesize guard. Code-reading alone would have missed that `claude` IS present in this env (so the egress tier is reachable) yet correctly gated."
+          "Evaluator proved zero-egress on the default path empirically by placing a failing `claude` shim first on PATH and confirming it never fired — stronger evidence than reading the args.synthesize guard. Code-reading alone would have missed that `claude` IS present in this env (so the egress tier is reachable) yet correctly gated."
         ],
         "harness_updates": []
       }
     },
     "graph-semantic-bridge": {
-      "title": "Semantic Bridge \u2014 Claude-Code Directions Report from the Graph",
+      "title": "Semantic Bridge — Claude-Code Directions Report from the Graph",
       "status": "completed",
       "phase": "passing",
       "problem_statement": "The heuristic graph-bridge.py ranks WHERE the white-space bridges are, but cannot reason about WHETHER they are any good, so there is no proposals.md-grade research-directions analysis generated from the graph.",
@@ -1345,10 +1346,10 @@
         "baseline": "0 (no semantic report generator; only the thin heuristic graph-bridge --synthesize line)",
         "target": "binary pass: one live /graph propose run produces a 100%-grounded, structurally-complete proposals.md-grade directions report (AC9) with AC1-AC8 + AC10 green; grounding gate proven (clean-accept, dirty-retry, cap-reject) in offline faked-engine tests",
         "direction": "binary",
-        "user_value_check": "today the analysis is hand-written; after, it is one AFK command that returns a harsh, grounded directions doc \u2014 and the user can trust the citations because the gate rejects hallucinations",
+        "user_value_check": "today the analysis is hand-written; after, it is one AFK command that returns a harsh, grounded directions doc — and the user can trust the citations because the gate rejects hallucinations",
         "how_measured": "uv run python -m pytest tests/test_graph_propose.py -q (AC1-AC7,AC10 offline, faked --claude-cmd) AND make test-graph (44/4) && make test-fulltext (45) && make test-bridge (26) (AC8 no-regression) AND one live `uv run python scripts/graph-propose.py` run with grep on the saved report (AC9 evidence-only)",
         "keep_revert_rule": "keep only if tests/test_graph_propose.py is green AND make test-graph (44/4) + make test-fulltext (45) + make test-bridge (26) stay green AND graph-build.py byte-unchanged AND ~/Desktop/research/proposals.md byte-unchanged; revert otherwise",
-        "simplicity_criterion": "import graph-bridge.build_proposals for candidates and subprocess graph-retrieve.py for passages (as graph-bridge already does) \u2014 do NOT fork either, do NOT touch graph-build.py or the 9-table round-trip; the only new I/O is the claude -p subprocess + the timestamped report write"
+        "simplicity_criterion": "import graph-bridge.build_proposals for candidates and subprocess graph-retrieve.py for passages (as graph-bridge already does) — do NOT fork either, do NOT touch graph-build.py or the 9-table round-trip; the only new I/O is the claude -p subprocess + the timestamped report write"
       },
       "acceptance_criteria": [
         {
@@ -1373,7 +1374,7 @@
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k grounding 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k grounding 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
           "status": "done",
-          "evidence": "clean-accept + dirty-then-clean retry proven \u2014 BUT only with ALL-CAPS FABRICATED-* fixtures; does not prove prose-case grounding"
+          "evidence": "clean-accept + dirty-then-clean retry proven — BUT only with ALL-CAPS FABRICATED-* fixtures; does not prove prose-case grounding"
         },
         {
           "id": "AC4",
@@ -1401,15 +1402,15 @@
         },
         {
           "id": "AC7",
-          "criterion": "Gold anchor available: the VTON x diffusion-sampling bridge appears in the candidate dossier by entity membership (not a hardcoded id) \u2014 reuses graph-bridge.build_proposals.",
+          "criterion": "Gold anchor available: the VTON x diffusion-sampling bridge appears in the candidate dossier by entity membership (not a hardcoded id) — reuses graph-bridge.build_proposals.",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k gold_anchor 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k gold_anchor 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
           "status": "done",
-          "evidence": "gold VTON\u00d7diffusion bridge present by entity membership (pytest -k gold_anchor green)"
+          "evidence": "gold VTON×diffusion bridge present by entity membership (pytest -k gold_anchor green)"
         },
         {
           "id": "AC8",
-          "criterion": "No regression: make test-graph (44 passed / 4 skipped), make test-fulltext (45 passed \u2014 live baseline 2026-06-07, was 44 at graph-bridge plan time), make test-bridge (26 passed) stay green; graph-build.py byte-unmodified.",
+          "criterion": "No regression: make test-graph (44 passed / 4 skipped), make test-fulltext (45 passed — live baseline 2026-06-07, was 44 at graph-bridge plan time), make test-bridge (26 passed) stay green; graph-build.py byte-unmodified.",
           "verification": "make test-graph 2>&1 | grep -qE '44 passed' && make test-fulltext 2>&1 | grep -qE '45 passed' && make test-bridge 2>&1 | grep -qE '[1-9][0-9]* passed'",
           "expected_exit": 0,
           "status": "done",
@@ -1421,7 +1422,7 @@
           "verification": "bash -c 'F=$(ls -t wiki/graph/proposals/*-directions.md 2>/dev/null | head -1); test -n \"$F\" && grep -qE \"## The bar\" \"$F\" && grep -qE \"^\\|\" \"$F\" && test $(grep -cE \"^### \" \"$F\") -ge 3 && grep -qiE \"Takedown\" \"$F\" && grep -qE \"## Ranking\" \"$F\" && grep -qE \"## Execution\" \"$F\" && grep -qE \"[0-9]+/[0-9]+ citations verified\" \"$F\"'",
           "expected_exit": 0,
           "status": "done",
-          "evidence": "Eval#2 (heal e867b29): original named attack CLOSED (attack A exit 2) and vacuous-pass guard rejects pure-prose/zero-cite reports (attacks C/D/E exit 2). BUT BR1 still not enforced for MIXED reports: /tmp attack F (one real backtick cite + 'Spatial Memorization framework' + 'Garment Fidelity objective' + 'As Chen shows') saved a CLEAN exit-0 report footer '1/1 citations verified \u2713' with all 3 fakes in the body. Two root causes: (1) _verify_citations:444 substring fallback certifies 8/16 plausible Title-Case fakes as grounded; (2) _extract_citations Tier3b suffix denylist misses 20/20 off-list suffixes + leading-capital article. Live directions-3.md is genuinely 20/20 grounded but by model compliance, not gate enforcement. AC9 grounding guarantee unmet -> needs-retry (1 left)."
+          "evidence": "Eval#2 (heal e867b29): original named attack CLOSED (attack A exit 2) and vacuous-pass guard rejects pure-prose/zero-cite reports (attacks C/D/E exit 2). BUT BR1 still not enforced for MIXED reports: /tmp attack F (one real backtick cite + 'Spatial Memorization framework' + 'Garment Fidelity objective' + 'As Chen shows') saved a CLEAN exit-0 report footer '1/1 citations verified ✓' with all 3 fakes in the body. Two root causes: (1) _verify_citations:444 substring fallback certifies 8/16 plausible Title-Case fakes as grounded; (2) _extract_citations Tier3b suffix denylist misses 20/20 off-list suffixes + leading-capital article. Live directions-3.md is genuinely 20/20 grounded but by model compliance, not gate enforcement. AC9 grounding guarantee unmet -> needs-retry (1 left)."
         },
         {
           "id": "AC10",
@@ -1459,7 +1460,7 @@
         },
         {
           "id": "T2",
-          "title": "RED: write tests/test_graph_propose.py covering AC1-AC7 + AC10, all failing because scripts/graph-propose.py is absent. Build a tiny self-contained fixture graph.db (mirror tests/test_graph_bridge.py / test_graph_gaps.py style) AND a set of fixture --claude-cmd shell scripts under a tmp dir: (a) clean fixture echoing a report citing ONLY allow-list slugs/entities, (b) dirty-then-clean fixture (first invocation emits a fabricated cite, second is clean \u2014 keyed off a retry-count file), (c) always-dirty fixture. Tests assert: dossier determinism+grounding (AC1), prompt contains profile+exemplar+allow-list+section-contract anchors (AC2), grounding gate clean-accept + dirty-retry with footer retry count (AC3), cap-exhaustion -> non-zero + .rejected.md + no clean file (AC4), proposals.md never written + output under wiki/graph/proposals/ + same-day -2 suffix (AC5), missing-db/missing-claude/missing-profile degradation (AC6), gold-anchor by entity membership reusing build_proposals (AC7). OFFLINE + deterministic \u2014 no real claude egress. Confirm RED before any impl.",
+          "title": "RED: write tests/test_graph_propose.py covering AC1-AC7 + AC10, all failing because scripts/graph-propose.py is absent. Build a tiny self-contained fixture graph.db (mirror tests/test_graph_bridge.py / test_graph_gaps.py style) AND a set of fixture --claude-cmd shell scripts under a tmp dir: (a) clean fixture echoing a report citing ONLY allow-list slugs/entities, (b) dirty-then-clean fixture (first invocation emits a fabricated cite, second is clean — keyed off a retry-count file), (c) always-dirty fixture. Tests assert: dossier determinism+grounding (AC1), prompt contains profile+exemplar+allow-list+section-contract anchors (AC2), grounding gate clean-accept + dirty-retry with footer retry count (AC3), cap-exhaustion -> non-zero + .rejected.md + no clean file (AC4), proposals.md never written + output under wiki/graph/proposals/ + same-day -2 suffix (AC5), missing-db/missing-claude/missing-profile degradation (AC6), gold-anchor by entity membership reusing build_proposals (AC7). OFFLINE + deterministic — no real claude egress. Confirm RED before any impl.",
           "agent": "tildi-generator",
           "status": "done",
           "files": [
@@ -1485,7 +1486,7 @@
         },
         {
           "id": "T3",
-          "title": "GREEN dossier + allow-list: scripts/graph-propose.py imports graph-bridge.build_proposals(conn, top_n=K) (default K=12, --bridges flag) for candidates \u2014 import, never fork. For each candidate assemble a deterministic JSON-serializable dossier: anchor entities, anchor papers, limitation/open-question claims (claim_type IN ('limitation','open-question')), and full-text passages via graph-retrieve.py as a SUBPROCESS (note: graph-retrieve.py emits JSON to stdout unconditionally \u2014 there is NO --json flag; parse stdout exactly as graph-bridge._retrieve_passages_for_paper already does). Build the citable allow-list = exact set of paper slugs + entity names present in the dossier. Missing db -> exit 1 + build hint; graph index absent -> passage note, not crash. Makes T2 dossier (AC1) + gold_anchor (AC7) green.",
+          "title": "GREEN dossier + allow-list: scripts/graph-propose.py imports graph-bridge.build_proposals(conn, top_n=K) (default K=12, --bridges flag) for candidates — import, never fork. For each candidate assemble a deterministic JSON-serializable dossier: anchor entities, anchor papers, limitation/open-question claims (claim_type IN ('limitation','open-question')), and full-text passages via graph-retrieve.py as a SUBPROCESS (note: graph-retrieve.py emits JSON to stdout unconditionally — there is NO --json flag; parse stdout exactly as graph-bridge._retrieve_passages_for_paper already does). Build the citable allow-list = exact set of paper slugs + entity names present in the dossier. Missing db -> exit 1 + build hint; graph index absent -> passage note, not crash. Makes T2 dossier (AC1) + gold_anchor (AC7) green.",
           "agent": "tildi-generator",
           "status": "done",
           "files": [
@@ -1522,7 +1523,7 @@
             "T3"
           ],
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k prompt 2>&1 | grep -qE '[1-9][0-9]* passed'",
-          "evidence": "grounding gate clean-accept + dirty-retry (AC3) \u2014 but extractor only sees ALL-CAPS + backtick spans",
+          "evidence": "grounding gate clean-accept + dirty-retry (AC3) — but extractor only sees ALL-CAPS + backtick spans",
           "scope_map": {
             "modify": [
               "scripts/graph-propose.py",
@@ -1618,7 +1619,7 @@
             "T7"
           ],
           "verification": "bash -c 'F=$(ls -t wiki/graph/proposals/*-directions.md 2>/dev/null | head -1); test -n \"$F\" && grep -qE \"## The bar\" \"$F\" && grep -qE \"^\\|\" \"$F\" && test $(grep -cE \"^### \" \"$F\") -ge 3 && grep -qiE \"Takedown\" \"$F\" && grep -qE \"## Ranking\" \"$F\" && grep -qE \"## Execution\" \"$F\" && grep -qE \"[0-9]+/[0-9]+ citations verified\" \"$F\"'",
-          "evidence": "live evidence: report saved but grounding gate is theater \u2014 prose hallucination passes as verified; BR1 not enforced",
+          "evidence": "live evidence: report saved but grounding gate is theater — prose hallucination passes as verified; BR1 not enforced",
           "scope_map": {
             "modify": [
               "wiki/graph/proposals/"
@@ -1640,7 +1641,7 @@
         "product": [],
         "process": [],
         "harness_updates": [],
-        "evaluator_2026-06-07": "harness/product: a grounding gate whose extractor only surfaces ALL-CAPS + backtick tokens cannot reject a prose-case hallucination ('the Garment Diffusion Transfer paper'); adversarial fake engine produced a clean exit-0 '0/0 verified \u2713' report with 3 fabricated cites. Tests were self-confirming (only fed ALL-CAPS FABRICATED-*). Fix: compel all cites into a checked form in the prompt AND assert prose/author-year hallucination is rejected in a test, OR broaden the verifier; also guard the 0/0 vacuous-pass."
+        "evaluator_2026-06-07": "harness/product: a grounding gate whose extractor only surfaces ALL-CAPS + backtick tokens cannot reject a prose-case hallucination ('the Garment Diffusion Transfer paper'); adversarial fake engine produced a clean exit-0 '0/0 verified ✓' report with 3 fabricated cites. Tests were self-confirming (only fed ALL-CAPS FABRICATED-*). Fix: compel all cites into a checked form in the prompt AND assert prose/author-year hallucination is rejected in a test, OR broaden the verifier; also guard the 0/0 vacuous-pass."
       },
       "eval_attempts": 2,
       "retries_remaining": 1
@@ -1649,8 +1650,8 @@
       "title": "Claude -p Reranker Tier",
       "status": "completed",
       "phase": "passing",
-      "problem_statement": "ollama is not installed on this machine, so rerank.py's cosine tier is inert and falls through to BM25-only order on every query \u2014 no semantic reranking happens at all. BM25 alone is keyword-only and misses semantic matches. The vault has `claude` on PATH; a `claude -p` tier placed between cosine and BM25-only gives real semantic reranking with zero new infrastructure.",
-      "jtbd": "When I run a retrieval query against my wiki or graph, I want the top-K results ordered by genuine semantic relevance to my query \u2014 not just keyword overlap \u2014 without having to install ollama, so I can read the most relevant passages first using the claude CLI I already have.",
+      "problem_statement": "ollama is not installed on this machine, so rerank.py's cosine tier is inert and falls through to BM25-only order on every query — no semantic reranking happens at all. BM25 alone is keyword-only and misses semantic matches. The vault has `claude` on PATH; a `claude -p` tier placed between cosine and BM25-only gives real semantic reranking with zero new infrastructure.",
+      "jtbd": "When I run a retrieval query against my wiki or graph, I want the top-K results ordered by genuine semantic relevance to my query — not just keyword overlap — without having to install ollama, so I can read the most relevant passages first using the claude CLI I already have.",
       "problem_classification": "unique",
       "user_context": "Single-tenant research vault. Owner: saris. claude CLI on PATH at /Users/saris.kia.adm/.local/bin/claude; ollama NOT installed (confirmed by recon: `which ollama` -> not found). Python 3.12 via uv run. Zero-egress default posture is a hard repo rule.",
       "spec_file": "specs/wiki-rerank-claude.md",
@@ -1739,7 +1740,7 @@
         },
         {
           "id": "AC7",
-          "criterion": "make test-retrieve passes green (exit 0) \u2014 no regression to existing 23 checks.",
+          "criterion": "make test-retrieve passes green (exit 0) — no regression to existing 23 checks.",
           "verification": "make test-retrieve >/dev/null 2>&1",
           "status": "done",
           "evidence": [
@@ -1748,11 +1749,11 @@
         },
         {
           "id": "AC8",
-          "criterion": "make test-graph passes green (exit 0) \u2014 no regression to the 44-passed/4-skipped graph suite.",
+          "criterion": "make test-graph passes green (exit 0) — no regression to the 44-passed/4-skipped graph suite.",
           "verification": "make test-graph >/dev/null 2>&1",
           "status": "done",
           "evidence": [
-            "make test-graph exit 0 \u2014 44 passed/4 skipped, baseline held, no regression"
+            "make test-graph exit 0 — 44 passed/4 skipped, baseline held, no regression"
           ]
         },
         {
@@ -1799,7 +1800,7 @@
         },
         {
           "id": "T2",
-          "title": "Implement rerank_claude(query, candidates, top_k, claude_cmd) in rerank.py: build grounded prompt (query + per-candidate chunk_id + snippet<=200 chars, no paths \u2014 BR9), call subprocess.run([claude_cmd,'-p'], input=prompt, timeout=60) mirroring graph-propose _run_claude, parse JSON id array, validate ids against input set (drop out-of-set BR2), assign rerank_score=1/(rank+1) and source 'claude:<cmd>', append unranked in BM25 order to fill top_k (FR6/BR8), graceful fallback sources (claude-not-found/timeout/parse-error/error -> BM25 order, never raise BR6).",
+          "title": "Implement rerank_claude(query, candidates, top_k, claude_cmd) in rerank.py: build grounded prompt (query + per-candidate chunk_id + snippet<=200 chars, no paths — BR9), call subprocess.run([claude_cmd,'-p'], input=prompt, timeout=60) mirroring graph-propose _run_claude, parse JSON id array, validate ids against input set (drop out-of-set BR2), assign rerank_score=1/(rank+1) and source 'claude:<cmd>', append unranked in BM25 order to fill top_k (FR6/BR8), graceful fallback sources (claude-not-found/timeout/parse-error/error -> BM25 order, never raise BR6).",
           "agent": "tildi-generator",
           "status": "completed",
           "files": [
@@ -1941,15 +1942,412 @@
       },
       "learning": {
         "technical": [
-          "Zero-egress default verified two ways: board AC3 uses a subprocess.run mock (assert_not_called), but the spec's BR4 demands a real executable fake that records invocation. A sentinel-touch fake_claude pointed via --claude-cmd on every default path (default retrieve, --rerank-tier auto, rerank() default kwargs, env-unset) never fired; only explicit --rerank-tier claude fired it (count 1). The control case is essential \u2014 it proves the probe is live, not silently dead.",
+          "Zero-egress default verified two ways: board AC3 uses a subprocess.run mock (assert_not_called), but the spec's BR4 demands a real executable fake that records invocation. A sentinel-touch fake_claude pointed via --claude-cmd on every default path (default retrieve, --rerank-tier auto, rerank() default kwargs, env-unset) never fired; only explicit --rerank-tier claude fired it (count 1). The control case is essential — it proves the probe is live, not silently dead.",
           "BR9 grounding can only be proven by capturing the actual stdin prompt. A capture-fake that cats stdin to a file let us assert seeded path/page_path/page_address/.md never appear in the prompt while chunk_ids+snippets do, and that snippets cap at 200+ellipsis."
         ],
         "product": [
           "The claude -p tier gives this ollama-less vault real semantic rerank with zero new infra, opt-in only. Default daily-query behavior is byte-identical to before (still BM25/noop)."
         ],
         "process": [
-          "Board AC verification commands here are grep-on-OK-string, not pytest -k. They work because test_retrieve.py prints stable 'OK   <label>' lines. Evaluator must confirm the exact label strings exist in stdout (they do) rather than trusting exit code alone \u2014 a renamed assert label would silently break the grep AC while the suite still exits 0."
+          "Board AC verification commands here are grep-on-OK-string, not pytest -k. They work because test_retrieve.py prints stable 'OK   <label>' lines. Evaluator must confirm the exact label strings exist in stdout (they do) rather than trusting exit code alone — a renamed assert label would silently break the grep AC while the suite still exits 0."
         ],
+        "harness_updates": []
+      }
+    },
+    "graph-resolve-apply": {
+      "id": "graph-resolve-apply",
+      "title": "Apply Safe Entity-Resolution Merges (connect the islands)",
+      "status": "in_progress",
+      "phase": "plan",
+      "problem_classification": "unique",
+      "problem_statement": "The Obsidian graph shows ~93 paper-islands. Only 136 of 755 canonical entities span >1 paper; duplicates were detected by P3's resolve.py but never merged. Until something writes the canonical_id pointers, every re-export reproduces the same fragmented graph and the five gap species under-count.",
+      "jtbd": "When the resolver has surfaced duplicate entities, I want to commit the ones I trust (fold each duplicate into its canonical twin so two papers that used different names for the same thing share one graph node), so I can turn 93 disconnected islands into a connected research map for cross-paper agreement/debate/white-space analysis.",
+      "user_context": "Single-tenant fork owner (saris). Phase 3.5 of the graphbuilding-fusion epic (docs/graphbuilding-fusion-design.md). P3 (graph-resolve-dedup) built the detector that only PROPOSES ('NEVER auto-modifies the vault'); this feature is the deferred apply: it takes the human-ratified safe subset of resolve.py's 34 live proposals (9 distinct merges, App-A) and writes them into the vault. The merge mechanism already exists in the schema (689 variant rows today); this only exercises it on a vetted list. Markdown stays the source of truth; the derived db is rebuilt, never hand-written.",
+      "spec_file": "specs/graph-resolve-apply.md",
+      "spec_status": "approved",
+      "approval": {
+        "approved_by": "saris",
+        "date": "2026-06-07",
+        "delegated": true,
+        "note": "Approved (delegated) FOR BUILD 2026-06-07. The single open gate is the App-A MERGE list ratification, which the conductor owns: no --commit (Stage B) until that human ratification.",
+        "domain_lead": "pending (conductor ratifies App-A)",
+        "tech_lead": "pending"
+      },
+      "depends_on": [
+        "graph-resolve-dedup"
+      ],
+      "blocks": [],
+      "human_gate": {
+        "gated": true,
+        "description": "The App-A merge list itself needs human ratification BEFORE any --commit run (spec 3, 12). Stage A is buildable now (dry-run only, no live mutation). Stage B (the live --commit apply + rebuild + re-baseline + post-merge metric ACs) is GATED: the conductor dispatches it only AFTER the human OKs App-A. The Generator must NOT run --commit until Stage B is dispatched.",
+        "owner": "conductor",
+        "blocks_stage": "B"
+      },
+      "scope_map": {
+        "modify": [
+          "scripts/graph-resolve-apply.py",
+          "specs/merges/graph-resolve-apply.tsv",
+          "tests/test_graph_resolve_apply.py",
+          "wiki/graph/entities/anydoor__e1366.md",
+          "wiki/graph/entities/classifier-free-guidance__e1354.md",
+          "wiki/graph/entities/classifier-free-guidance-cfg__e1386.md",
+          "wiki/graph/entities/cross-attention-conditioning__e1387.md",
+          "wiki/graph/entities/dinov2__e1367.md",
+          "wiki/graph/entities/mse-diffusion-loss__e1389.md",
+          "wiki/graph/entities/stable-diffusion__e934.md",
+          "wiki/graph/entities/clip__e1413.md",
+          "wiki/graph/entities/virtual-fashion-try-on__e1053.md",
+          "wiki/graph/graph-export.json",
+          "tests/test_graph_gaps.py",
+          "tests/test_graph_roundtrip.py"
+        ],
+        "read_only": [
+          "scripts/graph_db.py",
+          "scripts/graph-build.py",
+          "scripts/graph-export.py",
+          "scripts/graph-gaps.py",
+          "scripts/graph-resolve.py",
+          "scripts/graph-validate.py",
+          "pyproject.toml",
+          ".vault-meta/graph/graph.db",
+          "wiki/graph/entities/anydoor__e1149.md",
+          "wiki/graph/entities/classifier-free-guidance__e730.md",
+          "wiki/graph/entities/cross-attention-conditioning__e921.md",
+          "wiki/graph/entities/dinov2__e879.md",
+          "wiki/graph/entities/mse-diffusion-loss__e1359.md",
+          "wiki/graph/entities/stable-diffusion__e336.md",
+          "wiki/graph/entities/clip-vision-encoder__e1368.md",
+          "wiki/graph/entities/virtual-try-on__e914.md"
+        ],
+        "metric": {
+          "name": "paper-islands down / cross-paper shared entities up",
+          "baseline": "cross-paper-shared=136; louvain=91; components=72; variants=689; canonical=755 (measured 2026-06-07)",
+          "target": "cross-paper-shared>136; louvain<=91; components<=72; variants=698; canonical=746",
+          "direction": "increase"
+        }
+      },
+      "acceptance_criteria": [
+        {
+          "id": "AC1",
+          "criterion": "STAGE B. The 9 App-A losers each have is_canonical:false + canonical_id:<winner> + a canonical: wikilink after --commit apply.",
+          "verification": "n=0; for f in anydoor__e1366 classifier-free-guidance__e1354 classifier-free-guidance-cfg__e1386 cross-attention-conditioning__e1387 dinov2__e1367 mse-diffusion-loss__e1389 stable-diffusion__e934 clip__e1413 virtual-fashion-try-on__e1053; do n=$((n+$(grep -c 'is_canonical: false' wiki/graph/entities/$f.md))); done; test \"$n\" -eq 9",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC2",
+          "criterion": "STAGE A. Winner selection matches spec 4 on every applied pair (claim-degree on pre-merge root-resolved ids; tie -> min id). The dry-run printed plan equals the App-A loser->winner mapping.",
+          "verification": "uv run python scripts/graph-resolve-apply.py --merge-file specs/merges/graph-resolve-apply.tsv --json | uv run python -c \"import json,sys; p={int(x['loser']):int(x['winner']) for x in json.load(sys.stdin)['plan']}; assert p=={1366:1149,1354:730,1386:730,1387:921,1367:879,1389:1359,934:336,1413:1368,1053:914}, p\"",
+          "stage": "A",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC3",
+          "criterion": "STAGE B. No loser->loser chain; CFG group is flat into 730. After rebuild, root(1386) and root(1354) both return 730 in one hop.",
+          "verification": "uv run python -c \"import sqlite3,sys; sys.path.insert(0,'scripts'); from graph_db import root; c=sqlite3.connect('.vault-meta/graph/graph.db'); assert root(c,1386,compress=False)==730 and root(c,1354,compress=False)==730\"",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC4",
+          "criterion": "STAGE B. tests/test_graph_gaps.py + test_graph_roundtrip.py count baselines updated to post-merge values, each with a one-line comment noting the merge that moved them (old pre-merge value referenced).",
+          "verification": "git diff tests/test_graph_gaps.py tests/test_graph_roundtrip.py | grep -qE '^\\+.*(EXPECTED_TOTAL|EXPECTED_COUNTS|aliases|843)' && git diff tests/test_graph_gaps.py | grep -qiE '^\\+.*#.*(merge|pre-merge|899)'",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC5",
+          "criterion": "STAGE B. Round-trip stays byte-equal on the NEW (post-merge) markdown: export the live db to the vault, rebuild, and the rebuilt db matches the live db row-for-row on all 9 tables.",
+          "verification": "bash tests/roundtrip_live.sh",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC6",
+          "criterion": "STAGE B. Cross-paper shared entities RISES above the pre-merge baseline (136).",
+          "verification": "uv run python -c \"import sqlite3,sys; sys.path.insert(0,'scripts'); from graph_db import root; from collections import defaultdict; c=sqlite3.connect('.vault-meta/graph/graph.db'); p=defaultdict(set); [ (p[root(c,s,compress=False)].add(sp), p[root(c,o,compress=False)].add(sp)) for s,o,sp in c.execute('SELECT subject_entity_id,object_entity_id,source_paper FROM claims') ]; n=sum(1 for ps in p.values() if len(ps)>1); assert n>136, n\"",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC7",
+          "criterion": "STAGE B. Island count DROPS or holds: Louvain communities <= 91 (pre-merge measured) AND connected components <= 72; never higher.",
+          "verification": "uv run python -c \"import sqlite3,sys; sys.path.insert(0,'scripts'); from graph_db import root; import networkx as nx; c=sqlite3.connect('.vault-meta/graph/graph.db'); G=nx.Graph(); [G.add_node(r) for (r,) in c.execute('SELECT id FROM entities WHERE canonical_id IS NULL')]; [ (lambda a,b: G.add_edge(a,b) if a!=b and a in G and b in G else None)(root(c,s,compress=False),root(c,o,compress=False)) for s,o in c.execute('SELECT subject_entity_id,object_entity_id FROM claims') ]; lc=len(nx.community.louvain_communities(G,seed=42)); cc=nx.number_connected_components(G); assert lc<=91 and cc<=72, (lc,cc)\"",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC8",
+          "criterion": "STAGE B. make test-graph green on the updated baselines.",
+          "verification": "make test-graph",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC9",
+          "criterion": "STAGE B. The apply made ZERO edits to winner files, claim files, or paper files: git diff --name-only wiki/graph/ lists only the 9 loser entity .md plus the regenerated graph-export.json.",
+          "verification": "test \"$(git diff --name-only wiki/graph/ | grep -vE 'wiki/graph/entities/(anydoor__e1366|classifier-free-guidance__e1354|classifier-free-guidance-cfg__e1386|cross-attention-conditioning__e1387|dinov2__e1367|mse-diffusion-loss__e1389|stable-diffusion__e934|clip__e1413|virtual-fashion-try-on__e1053)\\.md|wiki/graph/graph-export\\.json' | wc -l | tr -d ' ')\" = 0",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC10",
+          "criterion": "STAGE A. Dry-run is the default and writes nothing; --commit is required to persist. Running the apply without --commit leaves the 9 loser files byte-unchanged (git clean on them).",
+          "verification": "uv run python scripts/graph-resolve-apply.py --merge-file specs/merges/graph-resolve-apply.tsv >/dev/null 2>&1; test -z \"$(git status --porcelain wiki/graph/entities/anydoor__e1366.md wiki/graph/entities/classifier-free-guidance__e1354.md wiki/graph/entities/clip__e1413.md)\"",
+          "stage": "A",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC11",
+          "criterion": "STAGE B. Fully reversible: git checkout the vault+specs+tests then rebuild restores the pre-merge counts exactly (cross-paper=136).",
+          "verification": "git stash --include-untracked >/dev/null 2>&1 || true; uv run python scripts/graph-build.py wiki/graph .vault-meta/graph/graph.db >/dev/null; uv run python -c \"import sqlite3,sys; sys.path.insert(0,'scripts'); from graph_db import root; from collections import defaultdict; c=sqlite3.connect('.vault-meta/graph/graph.db'); p=defaultdict(set); [ (p[root(c,s,compress=False)].add(sp), p[root(c,o,compress=False)].add(sp)) for s,o,sp in c.execute('SELECT subject_entity_id,object_entity_id,source_paper FROM claims') ]; assert sum(1 for ps in p.values() if len(ps)>1)==136\"; r=$?; git stash pop >/dev/null 2>&1 || true; exit $r",
+          "stage": "B",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC12",
+          "criterion": "STAGE A. Edge cases: missing db -> exit 1 with rebuild hint; empty/missing merge-file -> exit 1; idempotent re-run (--commit twice) -> second run all no-ops exit 0; frozenset dedup of DINOv2/MSE Tier-1+Tier-2 dupes; skip (not re-point) a loser already merged elsewhere.",
+          "verification": "uv run python -m pytest tests/test_graph_resolve_apply.py -v",
+          "stage": "A",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "T1",
+          "title": "STAGE A. Create specs/merges/graph-resolve-apply.tsv from App-A: 9 rows loser<TAB>winner<TAB>reason (1366->1149, 1354->730, 1386->730, 1387->921, 1367->879, 1389->1359, 934->336, 1413->1368, 1053->914). Plus header comment line. This is the reviewable, human-ratifiable merge artifact (FR10, the gate).",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "specs/merges/graph-resolve-apply.tsv"
+          ],
+          "depends_on": [],
+          "verification": "test -f specs/merges/graph-resolve-apply.tsv && test \"$(grep -vcE '^#' specs/merges/graph-resolve-apply.tsv)\" -eq 9",
+          "evidence": [],
+          "stage": "A",
+          "scope_map": {
+            "modify": [
+              "specs/merges/graph-resolve-apply.tsv"
+            ],
+            "read_only": [
+              "specs/graph-resolve-apply.md"
+            ],
+            "metric": "binary: 9 vetted loser->winner rows present"
+          }
+        },
+        {
+          "id": "T2",
+          "title": "STAGE A (TDD-first). Write tests/test_graph_resolve_apply.py against SANDBOX dbs/fixtures (NOT the live vault): winner-selection by claim-degree + tie->min-id (spec 4); frozenset dedup of duplicate pairs (DINOv2 1367/879, MSE 1389/1359); 3-way CFG group flattens to 730 (no 1386->1354); dry-run-default-writes-nothing; --commit writes loser frontmatter (is_canonical:false, canonical_id, canonical wikilink, merge_confidence); missing-db exit 1; missing/empty merge-file exit 1; loser-not-in-db skip+continue; already-merged-elsewhere skip (no re-point); idempotent re-run no-op exit 0; winner==loser self-pair skip. Tests RED first.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "tests/test_graph_resolve_apply.py"
+          ],
+          "depends_on": [
+            "T1"
+          ],
+          "verification": "uv run python -m pytest tests/test_graph_resolve_apply.py -q 2>&1 | grep -qE 'passed' && uv run python -m pytest tests/test_graph_resolve_apply.py -q >/dev/null 2>&1",
+          "evidence": [],
+          "stage": "A",
+          "scope_map": {
+            "modify": [
+              "tests/test_graph_resolve_apply.py"
+            ],
+            "read_only": [
+              "scripts/graph_db.py",
+              "specs/graph-resolve-apply.md"
+            ],
+            "metric": "binary: TDD suite covers winner-select/dedup/flat-chain/dry-run/edge-cases"
+          }
+        },
+        {
+          "id": "T3",
+          "title": "STAGE A. Implement scripts/graph-resolve-apply.py to green T2. Reads the derived db (degree via graph_db.root, compress=False) + the --merge-file; computes winner per spec 4; dedups pairs by frozenset; flattens multi-id groups to one winner; edits ONLY loser .md frontmatter (is_canonical:false, canonical_id:<winner>, canonical wikilink, merge_confidence). DRY-RUN is the DEFAULT (prints plan loser->winner + degrees + reason, exits 0, writes nothing); writes only with --commit. --json emits {plan:[{loser,winner,deg_loser,deg_winner,reason}]}. Missing db/merge-file -> exit 1. Idempotent. Does NOT rebuild (FR7). Imports degree/root from graph_db; does NOT touch resolve.py.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "scripts/graph-resolve-apply.py"
+          ],
+          "depends_on": [
+            "T2"
+          ],
+          "verification": "uv run python -m pytest tests/test_graph_resolve_apply.py -q",
+          "evidence": [],
+          "stage": "A",
+          "scope_map": {
+            "modify": [
+              "scripts/graph-resolve-apply.py"
+            ],
+            "read_only": [
+              "scripts/graph_db.py",
+              "scripts/graph-resolve.py",
+              ".vault-meta/graph/graph.db"
+            ],
+            "metric": "binary: T2 suite green; dry-run default; --commit gated"
+          }
+        },
+        {
+          "id": "T4",
+          "title": "STAGE A. Dry-run the apply on the LIVE vault and confirm it prints the computed plan (9 loser->winner with degrees) but writes NOTHING (AC2, AC10). Confirms the plan equals App-A on real data before any gate. Add tests/roundtrip_live.sh helper (export live db -> vault, rebuild to temp, row-for-row compare 9 tables) for AC5 use in Stage B; it must not depend on the absent legacy ~/.graphbuilding/graph.db.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "tests/roundtrip_live.sh"
+          ],
+          "depends_on": [
+            "T3"
+          ],
+          "verification": "uv run python scripts/graph-resolve-apply.py --merge-file specs/merges/graph-resolve-apply.tsv --json | uv run python -c \"import json,sys; p={int(x['loser']):int(x['winner']) for x in json.load(sys.stdin)['plan']}; assert p=={1366:1149,1354:730,1386:730,1387:921,1367:879,1389:1359,934:336,1413:1368,1053:914}\" && test -z \"$(git status --porcelain wiki/graph/entities/clip__e1413.md)\"",
+          "evidence": [],
+          "stage": "A",
+          "scope_map": {
+            "modify": [
+              "tests/roundtrip_live.sh"
+            ],
+            "read_only": [
+              ".vault-meta/graph/graph.db",
+              "scripts/graph-export.py",
+              "scripts/graph-build.py"
+            ],
+            "metric": "binary: live dry-run plan == App-A; zero writes"
+          }
+        },
+        {
+          "id": "T5",
+          "title": "STAGE B — GATED (conductor dispatches ONLY after human ratifies App-A). Run the live --commit apply: uv run python scripts/graph-resolve-apply.py --merge-file specs/merges/graph-resolve-apply.tsv --commit. Writes the 9 loser .md frontmatter. THE GENERATOR MUST NOT RUN THIS UNTIL STAGE B IS DISPATCHED. Verifies AC1, AC10-commit-side, AC9 (only 9 losers touched).",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "wiki/graph/entities/anydoor__e1366.md",
+            "wiki/graph/entities/classifier-free-guidance__e1354.md",
+            "wiki/graph/entities/classifier-free-guidance-cfg__e1386.md",
+            "wiki/graph/entities/cross-attention-conditioning__e1387.md",
+            "wiki/graph/entities/dinov2__e1367.md",
+            "wiki/graph/entities/mse-diffusion-loss__e1389.md",
+            "wiki/graph/entities/stable-diffusion__e934.md",
+            "wiki/graph/entities/clip__e1413.md",
+            "wiki/graph/entities/virtual-fashion-try-on__e1053.md"
+          ],
+          "depends_on": [
+            "T4"
+          ],
+          "verification": "n=0; for f in anydoor__e1366 classifier-free-guidance__e1354 classifier-free-guidance-cfg__e1386 cross-attention-conditioning__e1387 dinov2__e1367 mse-diffusion-loss__e1389 stable-diffusion__e934 clip__e1413 virtual-fashion-try-on__e1053; do n=$((n+$(grep -c 'is_canonical: false' wiki/graph/entities/$f.md))); done; test \"$n\" -eq 9",
+          "evidence": [],
+          "stage": "B",
+          "human_gate": true,
+          "scope_map": {
+            "modify": [
+              "wiki/graph/entities/<9 losers>.md"
+            ],
+            "read_only": [
+              ".vault-meta/graph/graph.db",
+              "specs/merges/graph-resolve-apply.tsv"
+            ],
+            "metric": "binary: 9 losers become variants"
+          }
+        },
+        {
+          "id": "T6",
+          "title": "STAGE B — GATED. Re-export + rebuild from the edited vault: uv run python scripts/graph-export.py .vault-meta/graph/graph.db wiki/graph then uv run python scripts/graph-build.py wiki/graph .vault-meta/graph/graph.db. Regenerates graph-export.json and the derived db so root() rolls losers into winners (flat CFG chain). Verifies AC3 (root(1386)==root(1354)==730 in one hop).",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "wiki/graph/graph-export.json"
+          ],
+          "depends_on": [
+            "T5"
+          ],
+          "verification": "uv run python scripts/graph-export.py .vault-meta/graph/graph.db wiki/graph >/dev/null && uv run python scripts/graph-build.py wiki/graph .vault-meta/graph/graph.db >/dev/null && uv run python -c \"import sqlite3,sys; sys.path.insert(0,'scripts'); from graph_db import root; c=sqlite3.connect('.vault-meta/graph/graph.db'); assert root(c,1386,compress=False)==730 and root(c,1354,compress=False)==730\"",
+          "evidence": [],
+          "stage": "B",
+          "human_gate": true,
+          "scope_map": {
+            "modify": [
+              "wiki/graph/graph-export.json",
+              "wiki/graph/entities/",
+              "wiki/graph/claims/",
+              "wiki/graph/papers/"
+            ],
+            "read_only": [
+              "scripts/graph-export.py",
+              "scripts/graph-build.py",
+              "scripts/graph_db.py"
+            ],
+            "metric": "binary: rebuild rolls losers into winners; CFG flat"
+          }
+        },
+        {
+          "id": "T7",
+          "title": "STAGE B — GATED. Re-baseline pinned counts to the NEW post-merge values with explanatory comments (FR8/AC4): tests/test_graph_gaps.py EXPECTED_COUNTS + EXPECTED_TOTAL (measure new values via graph-gaps.py --json --top 999; OLD pre-merge = 899 total, 65/0/473/49/312 — cite in comment) and any count assertions in tests/test_graph_roundtrip.py (aliases 834 -> new alias total after +9 loser canonical wikilinks change frontmatter; measure and pin). Each changed constant gets a one-line comment naming the App-A merge that moved it.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "tests/test_graph_gaps.py",
+            "tests/test_graph_roundtrip.py"
+          ],
+          "depends_on": [
+            "T6"
+          ],
+          "verification": "git diff tests/test_graph_gaps.py | grep -qiE '^\\+.*#.*(merge|pre-merge|899)' && uv run python -m pytest tests/test_graph_gaps.py tests/test_graph_roundtrip.py -q",
+          "evidence": [],
+          "stage": "B",
+          "human_gate": true,
+          "scope_map": {
+            "modify": [
+              "tests/test_graph_gaps.py",
+              "tests/test_graph_roundtrip.py"
+            ],
+            "read_only": [
+              "scripts/graph-gaps.py"
+            ],
+            "metric": "binary: baselines updated + commented; gaps/roundtrip green"
+          }
+        },
+        {
+          "id": "T8",
+          "title": "STAGE B — GATED. Final verification on the post-merge vault: make test-graph green (AC8); round-trip byte-equal on the NEW vault via tests/roundtrip_live.sh (AC5); metric ACs (AC6 cross-paper>136, AC7 louvain<=91 AND components<=72); AC9 only-9-losers-touched; AC11 reversibility. Confirm zero edits to winner/claim/paper files.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [],
+          "depends_on": [
+            "T7"
+          ],
+          "verification": "make test-graph && bash tests/roundtrip_live.sh",
+          "evidence": [],
+          "stage": "B",
+          "human_gate": true,
+          "scope_map": {
+            "modify": [],
+            "read_only": [
+              "tests/",
+              "scripts/",
+              "wiki/graph/",
+              ".vault-meta/graph/graph.db"
+            ],
+            "metric": "cross-paper-shared>136; louvain<=91; components<=72; test-graph green"
+          }
+        }
+      ],
+      "validation": {
+        "user_acceptance": "pending",
+        "business_metric": "pending"
+      },
+      "learning": {
+        "technical": [],
+        "product": [],
+        "process": [],
         "harness_updates": []
       }
     }

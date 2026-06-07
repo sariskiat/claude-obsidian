@@ -144,3 +144,7 @@ _attachments/
 # wiki/graph/papers/*.full.md ARE tracked (git SoT); the index dirs are not
 .vault-meta/graph/chunks/
 .vault-meta/graph/bm25/
+
+# P6 semantic bridge — rejected and debug report artifacts (not for git history)
+wiki/graph/proposals/*.rejected*.md
+wiki/graph/proposals/*.rejected.md

@@ -240,10 +240,12 @@ def _write_clean_engine(tmp_path: Path, allow_list_slugs: list, name: str = "cle
     The optional name parameter lets callers write multiple distinct engines
     to the same tmp_path without collisions.
     """
-    slugs_in_report = " ".join(allow_list_slugs[:2]) if allow_list_slugs else "vton-paper aek-paper"
+    # Backtick-wrap slugs so the new grounding gate can extract and verify them.
+    # The prompt now mandates backtick wrapping; the fixture must model that.
+    slugs_bt = " ".join(f"`{s}`" for s in allow_list_slugs[:2]) if allow_list_slugs else "`vton-paper` `aek-paper`"
     script = tmp_path / name
     script.write_text(f"""#!/bin/bash
-# Fake clean engine: cites only known allow-list slugs.
+# Fake clean engine: cites only known allow-list slugs (backtick-wrapped).
 cat <<'REPORT'
 ## The bar
 This is the bar section.
@@ -253,23 +255,23 @@ This is the bar section.
 | # | Direction | Ceiling | Odds |
 |---|-----------|:-------:|:----:|
 | 1 | Bridge virtual try-on with diffusion sampling | 5 | 3 |
-| 2 | Rate-distortion for {slugs_in_report} | 4 | 3 |
+| 2 | Rate-distortion bridge | 4 | 3 |
 
 ### 1. Virtual try-on meets diffusion sampling
 
-**Thesis:** Bridge vton-paper with aek-paper.
+**Thesis:** Bridge `vton-paper` with `aek-paper`.
 
 **Takedown:** Hard to execute at 4h/week.
 
 ### 2. Constrained sampling for garment pinning
 
-**Thesis:** Use aek-paper machinery for vton-paper constraints.
+**Thesis:** Use `aek-paper` machinery for `vton-paper` constraints.
 
 **Takedown:** Requires clean theorem derivation.
 
 ### 3. Rate-distortion ceiling analysis
 
-**Thesis:** Use other-paper formalism.
+**Thesis:** Use `other-paper` formalism.
 
 **Takedown:** Risk of pure benchmark paper.
 
@@ -277,11 +279,11 @@ This is the bar section.
 Direction 3 > 2 > 1 at solo 4h/week.
 
 ## Execution
-Week 1: reproduce baseline from aek-paper.
-Week 2: toy model using vton-paper setup.
+Week 1: reproduce baseline from `aek-paper`.
+Week 2: toy model using `vton-paper` setup.
 
 ---
-*Citations: vton-paper, aek-paper, other-paper*
+*Citations: `vton-paper`, `aek-paper`, `other-paper`*
 REPORT
 """)
     script.chmod(script.stat().st_mode | stat.S_IEXEC)
@@ -345,7 +347,7 @@ Direction 2 > 3 > 1.
 Week 1: reproduce vton-paper baseline.
 REPORT
 else
-    # Second call: clean report citing only real slugs
+    # Second call: clean report citing only real slugs (backtick-wrapped)
     cat <<'REPORT'
 ## The bar
 This is the bar section.
@@ -354,24 +356,24 @@ This is the bar section.
 
 | # | Direction | Ceiling |
 |---|-----------|:-------:|
-| 1 | Bridge vton-paper with aek-paper | 5 |
+| 1 | Bridge | 5 |
 | 2 | Rate-distortion approach | 4 |
 
 ### 1. Virtual try-on meets diffusion
 
-**Thesis:** Bridge vton-paper with aek-paper approach.
+**Thesis:** Bridge `vton-paper` with `aek-paper` approach.
 
 **Takedown:** Hard at 4h/week.
 
 ### 2. Rate-distortion ceiling
 
-**Thesis:** Formalize vton-paper encoder constraints.
+**Thesis:** Formalize `vton-paper` encoder constraints.
 
 **Takedown:** Risk of benchmark paper.
 
 ### 3. Constrained sampling
 
-**Thesis:** Use aek-paper for garment pinning.
+**Thesis:** Use `aek-paper` for garment pinning.
 
 **Takedown:** Needs clean theorem.
 
@@ -379,10 +381,10 @@ This is the bar section.
 Direction 3 > 2 > 1 solo.
 
 ## Execution
-Week 1: reproduce aek-paper baseline.
+Week 1: reproduce `aek-paper` baseline.
 
 ---
-*Citations: vton-paper, aek-paper*
+*Citations: `vton-paper`, `aek-paper`*
 REPORT
 fi
 """)
@@ -1082,3 +1084,299 @@ class TestWiring:
         content = p.read_text(encoding="utf-8")
         assert re.search(r"^test-propose:", content, re.MULTILINE), \
             "Makefile missing 'test-propose:' target"
+
+
+# ---------------------------------------------------------------------------
+# BR1 FIX: Vacuous-pass guard (fix #1) and prose-citation detection (fix #2)
+# ---------------------------------------------------------------------------
+
+def _write_zero_citation_engine(tmp_path: Path) -> Path:
+    """Write a shell script that emits a structurally valid report with NO citation tokens.
+
+    This simulates a model that discusses papers only in un-backticked, ordinary
+    prose with no ALL-CAPS tokens either — so _extract_citations() returns empty.
+    The gate must FAIL this (vacuous-pass guard), not emit '0/0 verified ✓'.
+    """
+    script = tmp_path / "zero_citation_engine.sh"
+    script.write_text("""#!/bin/bash
+cat <<'REPORT'
+## The bar
+Three uncomfortable truths: the bar is very high.
+
+## Decision matrix
+
+| # | Direction | Ceiling | Odds |
+|---|-----------|:-------:|:----:|
+| 1 | Garment Diffusion Transfer | 5 | 2 |
+| 2 | Try-on network integration | 4 | 3 |
+
+### 1. Garment Diffusion Transfer
+
+**Thesis:** This direction builds on recent garment transfer work. The Garment
+Diffusion Transfer paper showed promising results. Wang et al. 2024 extended this.
+
+**Takedown:** Fundamentally hard without theory muscle.
+
+### 2. Try-on network integration
+
+**Thesis:** The phantom-tryon-net approach is interesting.
+
+**Takedown:** Scoop risk is high.
+
+### 3. Constrained sampling bridge
+
+**Thesis:** Connect diffusion sampling with try-on constraints.
+
+**Takedown:** Requires clean theorem derivation.
+
+## Ranking
+Direction 3 > 2 > 1 at solo 4h/week.
+
+## Execution
+Week 1: reproduce the baseline from the Garment Diffusion Transfer paper.
+REPORT
+""")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return script
+
+
+def _write_adversarial_engine(tmp_path: Path) -> Path:
+    """Write an adversarial engine that cites one real backticked slug + three prose fakes.
+
+    Real slug (backticked, in allow-list): `vton-paper`
+    Fabrications:
+      - 'the Garment Diffusion Transfer paper'  (Title-Case + 'paper')
+      - 'Wang et al. 2024'                      (author-year)
+      - bare prose 'phantom-tryon-net'           (without backticks, not in graph.db)
+
+    The gate must flag the three fakes, retry, and on persistence exit non-zero
+    with a .rejected.md.  This engine always emits the same adversarial output.
+    """
+    script = tmp_path / "adversarial_engine.sh"
+    script.write_text("""#!/bin/bash
+cat <<'REPORT'
+## The bar
+The bar is steep. Three truths apply here.
+
+## Decision matrix
+
+| # | Direction | Ceiling | Odds |
+|---|-----------|:-------:|:----:|
+| 1 | Diffusion bridge | 5 | 2 |
+| 2 | Constrained sampling | 4 | 3 |
+
+### 1. Garment Diffusion Transfer approach
+
+**Thesis:** Based on `vton-paper` methodology, this extends the Garment Diffusion
+Transfer paper. Wang et al. 2024 showed that phantom-tryon-net can be adapted for
+this purpose.
+
+**Takedown:** Too dependent on unavailable data.
+
+### 2. Constrained diffusion sampling
+
+**Thesis:** Extend `vton-paper` constraints.
+
+**Takedown:** Needs theorem co-author.
+
+### 3. Rate-distortion bridge
+
+**Thesis:** Combine approaches from `vton-paper`.
+
+**Takedown:** Risk of pure benchmark.
+
+## Ranking
+Direction 3 > 2 > 1 at solo 4h/week.
+
+## Execution
+Week 1: reproduce `vton-paper` baseline.
+REPORT
+""")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return script
+
+
+class TestVacuousPassGuard:
+    """BR1 fix #1: A non-empty report with zero extracted citations must FAIL.
+
+    The grounding gate must never emit '0/0 citations verified' as a clean pass
+    for a non-empty report — that is theater, not a guard.
+    """
+
+    @pytest.fixture
+    def fixture_db(self, tmp_path):
+        return _fixture_db_path(tmp_path)
+
+    @pytest.fixture
+    def proposals_dir(self, tmp_path):
+        d = tmp_path / "proposals"
+        d.mkdir()
+        return d
+
+    def test_zero_citation_report_fails_nonzero_exit(self, fixture_db, proposals_dir, tmp_path):
+        """A report with zero extractable citations (none backticked, none ALL-CAPS)
+        must produce a non-zero exit — not a clean save — vacuous-pass guard.
+        """
+        engine = _write_zero_citation_engine(tmp_path)
+        rc, out, err = _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "1",
+        )
+        assert rc != 0, (
+            f"A zero-citation non-empty report must fail (non-zero exit), got rc={rc}. "
+            f"This is the vacuous-pass guard: '0/0 verified' is NOT a clean pass. stderr: {err}"
+        )
+
+    def test_zero_citation_report_no_clean_save(self, fixture_db, proposals_dir, tmp_path):
+        """Zero-citation non-empty report: no clean -directions.md should be written."""
+        engine = _write_zero_citation_engine(tmp_path)
+        _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "1",
+        )
+        clean_reports = list(proposals_dir.glob("*-directions.md"))
+        assert len(clean_reports) == 0, (
+            f"No clean report should be saved for a zero-citation report, found: "
+            f"{[r.name for r in clean_reports]}"
+        )
+
+    def test_zero_citation_report_writes_rejected(self, fixture_db, proposals_dir, tmp_path):
+        """Zero-citation non-empty report: a .rejected.md must be written."""
+        engine = _write_zero_citation_engine(tmp_path)
+        _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "1",
+        )
+        rejected = list(proposals_dir.glob("*.rejected.md"))
+        assert len(rejected) >= 1, (
+            f"Expected a .rejected.md for zero-citation report, found none in {proposals_dir}"
+        )
+
+
+class TestProseAdversarialCitations:
+    """BR1 fix #2: Prose-shaped citations (author-year, Title-Case+paper) must be detected.
+
+    An adversarial report that cites one real backticked slug PLUS three fabrications
+    in ordinary prose must trigger retries and ultimately exit non-zero with .rejected.md.
+    """
+
+    @pytest.fixture
+    def fixture_db(self, tmp_path):
+        return _fixture_db_path(tmp_path)
+
+    @pytest.fixture
+    def proposals_dir(self, tmp_path):
+        d = tmp_path / "proposals"
+        d.mkdir()
+        return d
+
+    def test_adversarial_prose_cites_flagged_rejected(self, fixture_db, proposals_dir, tmp_path):
+        """Adversarial report: one real backticked slug + 3 prose fakes -> non-zero exit
+        and .rejected.md, NOT a clean save.
+        """
+        engine = _write_adversarial_engine(tmp_path)
+        rc, out, err = _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "2",
+        )
+        assert rc != 0, (
+            f"Adversarial engine with prose-hallucinations must fail (non-zero exit), "
+            f"got rc={rc}. The prose-citation detector is required. stderr: {err}"
+        )
+
+    def test_adversarial_prose_no_clean_save(self, fixture_db, proposals_dir, tmp_path):
+        """Adversarial report: no clean -directions.md must be written."""
+        engine = _write_adversarial_engine(tmp_path)
+        _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "2",
+        )
+        clean_reports = list(proposals_dir.glob("*-directions.md"))
+        assert len(clean_reports) == 0, (
+            f"No clean report should be saved for adversarial prose engine, found: "
+            f"{[r.name for r in clean_reports]}"
+        )
+
+    def test_adversarial_prose_writes_rejected_md(self, fixture_db, proposals_dir, tmp_path):
+        """Adversarial report: a .rejected.md artifact must be written."""
+        engine = _write_adversarial_engine(tmp_path)
+        _run_propose(
+            "--db", str(fixture_db),
+            "--output-dir", str(proposals_dir),
+            "--profile", str(PROFILE_PATH),
+            "--claude-cmd", str(engine),
+            "--retries", "2",
+        )
+        rejected = list(proposals_dir.glob("*.rejected.md"))
+        assert len(rejected) >= 1, (
+            f"Expected a .rejected.md after adversarial prose engine, found none in {proposals_dir}"
+        )
+
+    def test_adversarial_author_year_detected(self, tmp_path):
+        """Unit test: 'Wang et al. 2024' is extracted by _extract_citations."""
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location("graph_propose", str(PROPOSE_SCRIPT))
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        text = "Based on Wang et al. 2024 findings, the method works well."
+        cites = mod._extract_citations(text)
+        assert any("wang" in c.lower() or "2024" in c for c in cites), (
+            f"'Wang et al. 2024' must be extracted as a citation. Got: {cites}"
+        )
+
+    def test_adversarial_title_case_paper_detected(self, tmp_path):
+        """Unit test: 'the Garment Diffusion Transfer paper' is extracted."""
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location("graph_propose", str(PROPOSE_SCRIPT))
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        text = "Building on the Garment Diffusion Transfer paper approach."
+        cites = mod._extract_citations(text)
+        assert any("garment" in c.lower() or "diffusion transfer" in c.lower() or "garment diffusion" in c.lower() for c in cites), (
+            f"'Garment Diffusion Transfer paper' must be extracted. Got: {cites}"
+        )
+
+    def test_section_headers_not_flagged(self, tmp_path):
+        """Unit test: section headers like '## The bar', '## Decision matrix', '## Ranking',
+        '## Execution' must NOT be extracted as citations — no false positives.
+        """
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location("graph_propose", str(PROPOSE_SCRIPT))
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        text = """## The bar
+This is analysis.
+
+## Decision matrix
+
+| # | Direction |
+
+## Ranking
+Direction 3 > 2.
+
+## Execution
+Week 1.
+"""
+        cites = mod._extract_citations(text)
+        section_false_positives = {c for c in cites if c.lower() in {
+            "the bar", "decision matrix", "ranking", "execution",
+            "the", "bar", "decision", "matrix",
+        }}
+        assert len(section_false_positives) == 0, (
+            f"Section headers must not be extracted as citations. Got FPs: {section_false_positives}"
+        )

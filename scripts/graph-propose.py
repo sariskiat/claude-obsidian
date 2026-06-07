@@ -279,12 +279,16 @@ def _build_prompt(
         "directions report — opinionated, specific, brutal on the takedowns. "
         "Your primary loyalty is to the user's stated goal (top-tier PhD ticket), "
         "not to making them feel good about the directions.\n\n"
-        "IMPORTANT — CITATION SAFETY:\n"
-        "You MUST cite ONLY paper slugs and entity names from the explicit allow-list "
-        "below. Do NOT invent paper slugs, author names, or entity names that are not "
-        "in this allow-list. Any citation not in the allow-list will be rejected and "
-        "you will be asked to redo the report.\n\n"
-        f"ALLOW-LIST (cite ONLY these):\n{allow_list_str}\n"
+        "CRITICAL — CITATION SAFETY (HARD RULE):\n"
+        "1. You MUST cite ONLY paper slugs and entity names from the explicit ALLOW-LIST below.\n"
+        "2. EVERY reference to a paper, model, or graph entity MUST be wrapped in backticks: "
+        "`slug-or-entity-name`. Examples: `vton-paper`, `diffusion sampling`.\n"
+        "3. Do NOT name papers, authors, or entities in un-backticked prose. "
+        "Forbidden: 'the Garment Diffusion Transfer paper', 'Wang et al. 2024', "
+        "'phantom-tryon-net'. Allowed: `vton-paper`, `virtual try-on`.\n"
+        "4. Any citation not in the allow-list will be flagged as unverified and "
+        "you will be asked to rewrite the entire report.\n\n"
+        f"ALLOW-LIST (cite ONLY these, always backtick-wrapped):\n{allow_list_str}\n"
     )
 
     profile_block = f"## Research Profile\n\n{profile_text.strip()}\n"
@@ -326,28 +330,80 @@ def _build_prompt(
 def _extract_citations(report_text: str) -> set:
     """Extract citation-like tokens from a report for grounding verification.
 
-    Two-tier strategy:
+    Three-tier strategy:
     1. ALL-CAPS hyphenated tokens (FABRICATED-PAPER-9999, HALLUCINATED-ENTITY-XYZ)
-       — these are clear hallucination markers (the prompt explicitly says not to
-       invent citations, so any ALL-CAPS compound is a red flag).
-    2. Lowercase slug-like tokens that appear in backtick code spans or after
-       known citation markers like 'paper:' or '[' — narrowed to reduce false
-       positives from prose compound modifiers.
+       — clear hallucination markers; the prompt explicitly forbids inventing citations.
+    2. Backtick-quoted slug-like tokens (`vton-paper`, `aek-diffusion-sampler`)
+       — the prompt mandates backtick wrapping for ALL paper/entity references;
+       these are intentional citations.
+    3. High-precision prose-shaped citations that unambiguously escaped backticks:
+       a) Author-year patterns: "Wang et al. 2024", "Kamb and Ganguli 2023"
+       b) Title-Case Name followed by a domain suffix word:
+          "Garment Diffusion Transfer paper", "Phantom Try-On Network model"
+          Domain suffix words: paper|method|model|net|network|diffusion|
+                               transformer|framework|approach|system
+       Precision over recall: section headers (## The bar, ## Decision matrix,
+       ## Ranking, ## Execution), generic capitalised words, and table cells
+       are deliberately excluded by requiring the domain suffix word.
 
-    The allow-list + suffix-match in _verify_citations handles the rest.
+    The allow-list + suffix-match in _verify_citations handles resolution.
     """
     citations = set()
 
-    # ALL-CAPS hyphenated tokens (FABRICATED-PAPER-9999, HALLUCINATED-ENTITY-XYZ)
-    for m in re.finditer(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+){1,})\b", report_text):
+    # Strip markdown headings to avoid false positives from section titles.
+    # We blank them out in a local copy but keep positions consistent.
+    stripped = re.sub(r"^#{1,6}\s+.*$", "", report_text, flags=re.MULTILINE)
+
+    # Tier 1 — ALL-CAPS hyphenated compound tokens
+    for m in re.finditer(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+){1,})\b", stripped):
         citations.add(m.group(1))
 
-    # Backtick-quoted tokens (the report may cite slugs in `code spans`)
-    # These are likely intentional citations, not prose compound modifiers.
-    for m in re.finditer(r"`([a-z][a-z0-9]+(?:-[a-z0-9]+){2,})`", report_text):
+    # Tier 2 — backtick-quoted slug-like tokens (primary cite mechanism)
+    # Pattern: `word-word[-word...]` with min total length 10
+    for m in re.finditer(r"`([a-z][a-z0-9]+(?:-[a-z0-9]+){1,})`", report_text):
         tok = m.group(1)
-        if len(tok) >= 10:
+        if len(tok) >= 8:
             citations.add(tok)
+
+    # Tier 3a — Author-year: "Surname et al. YYYY" or "Surname and Surname YYYY"
+    # Require 4-digit year 19xx/20xx; require "et al." or " and " linkage.
+    _AUTHOR_YEAR = re.compile(
+        r"\b([A-Z][a-z]{1,}(?:\s+(?:et al\.|and\s+[A-Z][a-z]{1,})))"
+        r"\s+(\b(?:19|20)\d{2})\b"
+    )
+    for m in _AUTHOR_YEAR.finditer(stripped):
+        # Emit as "Surname et al. YYYY" so it is testable + verifiable
+        citations.add(f"{m.group(1).strip()} {m.group(2)}")
+
+    # Tier 3b — Title-Case Name phrase + domain suffix word
+    # Matches 2+ consecutive Title-Case words immediately followed by a domain keyword.
+    # "the Garment Diffusion Transfer paper" → captures "Garment Diffusion Transfer"
+    # (lowercase "the" is NOT Title-Case so the match starts at "Garment").
+    # "## The bar" → stripped by the heading removal above; never reaches here.
+    # "The Garment..." → first word "The" is in _SECTION_WORDS_TC → excluded.
+    _DOMAIN_SUFFIX_WORDS_T3B = [
+        "paper", "method", "model", "net", "network", "diffusion", "transformer",
+        "framework", "approach", "system", "architecture", "module", "decoder",
+        "encoder", "sampler",
+    ]
+    _TITLE_CASE_PHRASE_T3B = re.compile(
+        r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:"
+        + "|".join(_DOMAIN_SUFFIX_WORDS_T3B)
+        + r")\b"
+    )
+    # Title-Case section-header words that may appear first — exclude them
+    _SECTION_WORDS_TC = frozenset({
+        "The", "Decision", "Ranking", "Execution", "Bridge", "This", "That",
+        "Building", "Based", "Using", "Both", "From", "Note", "See",
+    })
+    for m in _TITLE_CASE_PHRASE_T3B.finditer(stripped):
+        phrase = m.group(1).strip()
+        words = phrase.split()
+        if len(words) < 2:
+            continue
+        if words[0] in _SECTION_WORDS_TC:
+            continue
+        citations.add(phrase.lower())
 
     return citations
 
@@ -609,6 +665,24 @@ def main() -> int:
         citations = _extract_citations(candidate_report)
         _, unverified = _verify_citations(citations, allow_list, conn)
 
+        # Vacuous-pass guard (BR1): a non-empty report with ZERO extracted citations
+        # is NOT a clean pass — it means the extractor found nothing to verify,
+        # which happens when the model cited everything in un-backticked prose.
+        # Treat it as "all citations unverified" so the gate retries/rejects.
+        if not citations and candidate_report:
+            print(
+                f"Grounding check attempt {attempt + 1}: "
+                "zero citations extracted from a non-empty report — "
+                "treating as vacuous-pass failure (prose citations may be unverifiable).",
+                file=sys.stderr,
+            )
+            unverified_final = {"(no citations extracted — prose-only report)"}
+            if attempt < args.retries:
+                current_prompt = _build_retry_prompt(prompt, unverified_final)
+                retry_count = attempt + 1
+            # else: fall through to cap-exhaustion
+            continue
+
         if not unverified:
             # Clean pass
             report_text = candidate_report
@@ -681,7 +755,7 @@ def main() -> int:
         f"\n\n---\n\n"
         f"*Grounding audit: {verified_count}/{total_count} citations verified ✓ "
         f"| retries: {retry_count} "
-        f"| model: {model_id} "
+        f"| engine: {model_id} "
         f"| bridge candidates: {len(proposals)}*\n"
     )
 

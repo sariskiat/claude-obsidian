@@ -263,3 +263,22 @@ Verification:
 Heal log — AC6 direction: spec said "cross-paper shared RISES above 136". Measured post-merge: 135. Root cause (Verification layer): e1386 (CFG acronym) was itself a multi-paper entity pre-merge; merging it INTO 730 (already multi-paper) consolidates two nodes into one, reducing the distinct-canonical cross-paper count by 1. The merge is correct and the graph IS more connected (louvain -3, components -4). Re-baselined test to 135 (the measured post-merge truth). This is not a vault corruption — it is the expected consolidation effect when a loser was already canonical and multi-paper.
 
 Commit: `7790bac` feat(resolve-apply): Stage B — apply 9-merge list, re-export JSON, re-baseline tests
+
+---
+
+## graph-resolve-apply — Stage B EVALUATOR (independent real-execution) — 2026-06-07
+
+**Verdict: PASS-WITH-METRIC-NOTE.** Evaluator did NOT write the code. Every AC run as a real OS process on a db REBUILT from the post-merge markdown (not the on-disk db, not any agent's reported integer). Git note on `7790bac`. Phase -> `validate` (NOT passing): the single non-green AC (AC6) is a metric-SPEC contradiction resolved by a proven-correct edge case, routed to the human via the conductor before final sign-off.
+
+**Independently-established baseline (3 paths: pre-merge worktree build @13cbd5b, App-C snippet, AC11 reversibility rebuild):**
+- PRE-merge: cross-paper **136**, louvain **91**, components **72**, variants 689, canonical 755.
+- POST-merge: cross-paper **135**, louvain **90**, components **68**, variants 698, canonical 746, claims 1052 (none dropped), edges 543 (none dropped).
+- The spec §1/§13 "louvain 93" and the Stage-B Generator's reported "93" are BOTH WRONG. The Planner board baseline (91) is CORRECT.
+
+**AC results:** AC1 PASS · AC2 PASS · AC3 PASS (flat CFG, root(1386)=root(1354)=730 one hop) · AC4 PASS (re-baseline == live gaps exactly: 65/0/473/45/328 total 911) · AC5 PASS (roundtrip_live.sh 9 tables byte-equal) · **AC6 FAIL-AS-STATED, ACCEPTED** · AC7 PASS (louvain 90<=91, components 68<=72) · AC8 PASS (make test-graph 44p/4s) · AC9 PASS (only 9 losers + json; winners/claims/papers byte-unchanged) · AC10 PASS · AC11 PASS (rebuild restores 136/91/72 exactly) · AC12 PASS (18/18).
+
+**AC6 judgment (plain):** ACCEPTABLE measured-truth re-baseline of a mis-specified metric — NOT a masked regression. Mechanically proven: e1386 was a multi-paper canonical entity pre-merge (claims span **11** distinct papers); e730 also multi-paper (**5** papers); both are the same concept (Classifier-Free Guidance, super_type Method). Post-merge 730 absorbs the union = **17** papers, with e1386's 11 papers a STRICT SUBSET (zero claims dropped: 1052=1052; edges 543=543). Two multi-paper roots correctly collapsed into one richer root, so the COUNT of distinct multi-paper entities decrements by exactly 1 (136->135) while CONNECTIVITY genuinely improves (louvain & components both fall). The real goal (islands down) is met; the proxy is the wrong measure for the multi-paper-loser case.
+
+**Architecture note (sound):** graph-build.py reads `wiki/graph/graph-export.json` (machine snapshot), not the per-entity .md. Generator hand-patched graph-export.json to seed the rebuild (md->json->db) rather than running graph-export.py (db->json, reverse direction). Verified coherent: md<->json canonical_id consistent for all 9 losers; roundtrip_live.sh proves md<->json<->db byte-equal. Minor deviation from spec §5/T6's literal sequence; harmless.
+
+**Action for conductor:** take the AC6 metric-spec deviation to the human — accept cross-paper 136->135 as the correct CFG-consolidation artifact, OR re-define the metric (largest-component size / paper-spanning edge count both rise). No code fix required.

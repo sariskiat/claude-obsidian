@@ -323,6 +323,18 @@ def _build_prompt(
 # Grounding gate (FR8)
 # ---------------------------------------------------------------------------
 
+_CITATION_STOPLIST = frozenset([
+    # Common English multi-word compound modifiers that are never paper slugs
+    "as-a-feature", "as-a-resource", "as-a-service", "as-a-tool",
+    "appearance-versus-motion", "appearance-vs-motion", "appearance-vs-temporal",
+    "proof-of-concept", "state-of-the-art", "end-to-end", "plug-and-play",
+    "one-size-fits-all", "case-by-case", "step-by-step", "side-by-side",
+    "patch-for-patch", "pixel-for-pixel", "one-to-one", "one-to-many",
+    "compression-of-conditioning", "generation-of-conditioning",
+    "bits-survived", "clean-exec",
+])
+
+
 def _extract_citations(report_text: str) -> set:
     """Extract citation-like tokens from a report.
 
@@ -331,8 +343,8 @@ def _extract_citations(report_text: str) -> set:
       are hallucination markers and always flagged.
     - Lowercase slug-like tokens are only flagged if they have at least 2 hyphens
       (3+ word slugs like 'diffusion-sampling-with-momentum') to avoid false
-      positives from two-part compound adjectives like 'boundary-locus',
-      'co-author', 'clean-exec', etc.
+      positives from two-part compound adjectives, AND must not be in the
+      stop-list of common English multi-word modifiers.
     """
     citations = set()
 
@@ -344,8 +356,8 @@ def _extract_citations(report_text: str) -> set:
     # This filters out two-part compound adjectives that appear in body prose.
     for m in re.finditer(r"\b([a-z][a-z0-9]+(?:-[a-z0-9]+){2,})\b", report_text):
         tok = m.group(1)
-        # Skip very short tokens (noise)
-        if len(tok) >= 10:
+        # Skip short tokens and well-known English modifiers
+        if len(tok) >= 10 and tok not in _CITATION_STOPLIST:
             citations.add(tok)
 
     return citations
@@ -369,18 +381,22 @@ def _verify_citations(citations: set, allow_list: list, conn) -> tuple[set, set]
     verified = set()
     unverified = set()
 
+    allow_set_lower = {a.lower() for a in allow_set}
+    db_entities_lower = {e.lower() for e in db_entities}
+
     for cite in citations:
         cite_lower = cite.lower()
         # Also try space-separated version for entity name matching
         cite_spaced = cite.replace("-", " ").lower()
-        db_entities_lower = {e.lower() for e in db_entities}
         if (cite in allow_set or
-                cite_lower in {a.lower() for a in allow_set} or
+                cite_lower in allow_set_lower or
                 cite in db_slugs or
                 cite_lower in db_entities_lower or
                 cite_spaced in db_entities_lower or
-                # Allow partial slug matches (e.g. slug prefix matches an entity name)
-                any(cite_lower in e or e in cite_lower for e in db_entities_lower if len(e) > 6)):
+                # Suffix match: e.g. "ton-textured-3d-..." is a strict suffix of the real slug
+                any(real_slug.endswith(cite_lower) for real_slug in db_slugs) or
+                # Allow partial entity name matches (substring either way)
+                any(cite_lower in e or e in cite_lower for e in db_entities_lower if len(e) > 8)):
             verified.add(cite)
         else:
             unverified.add(cite)

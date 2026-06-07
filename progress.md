@@ -180,3 +180,40 @@ BR1 closed and verified by REAL /tmp fake-engine probes (not self-report).
 - Minor (non-blocking): `graph-fulltext.py` +6 lines (slug-dir fallback) sits outside `scope_map.modify` but pre-dates heal-3 and is covered by the green `test-fulltext` 45 baseline; not a crux file.
 
 **Verdict: PASS.** Board → phase=passing, status=completed. Git note `grade: pass` on `bcf165f`. Human MR.
+
+---
+
+## 2026-06-07 — Generator: wiki-rerank-claude (T1-T7) — cycle complete
+
+**Commit:** `d5b4a87 feat(rerank): add claude -p reranker tier with opt-in flag and zero-egress default`
+
+TDD cycle: 6 failing tests written first (RED confirmed), then implementation (GREEN confirmed).
+
+Changes:
+- `scripts/rerank.py`: added `rerank_claude(query, candidates, top_k, claude_cmd)` function + extended `rerank()` signature with `rerank_tier` / `claude_cmd` kwargs; `--peek` output gains `rerank_tier` field; `subprocess` import added (stdlib only).
+- `scripts/retrieve.py`: added `--rerank-tier {auto,claude}` and `--claude-cmd CMD` flags; forwards both to `reranker.rerank()`; `--no-rerank` still short-circuits.
+- `scripts/graph-retrieve.py`: same two flags with identical RERANK_TIER env-var default + forwarding; direct-load (--paper/--claim) path untouched.
+- `tests/test_retrieve.py`: 6 new test functions (AC1-AC5, AC10); `_make_fake_claude_exe` + `_make_never_called_claude_exe` helpers.
+
+Verification (all green):
+- `python3 tests/test_retrieve.py`: **43 assertions passed** (was 23; +20 from new tests)
+- `make test-retrieve`: green
+- `make test-graph`: **44 passed / 4 skipped** (baseline held)
+- `uv run python scripts/rerank.py --peek 'test'`: `rerank_tier: auto` present
+- `python3 scripts/graph-retrieve.py --help`: `--rerank-tier` + `--claude-cmd` present
+
+AC status (verified):
+- AC1: `OK   claude tier reorders by given ids` — PASS
+- AC2: `OK   claude tier drops invented ids` — PASS
+- AC3: `OK   default path no claude call` — PASS (subprocess.run mock asserted never called)
+- AC4: `OK   retrieve CLI claude tier strategy` — PASS (strategy contains 'claude')
+- AC5: `OK   fallback ladder` — PASS (noop-no-ollama / claude:... / claude-error)
+- AC6: offline + fast (<10s, no egress, all fake engines) — PASS
+- AC7: make test-retrieve green — PASS
+- AC8: make test-graph 44/4 — PASS
+- AC9: --peek rerank_tier present — PASS
+- AC10: `OK   no-rerank beats claude tier` — PASS
+
+Zero-egress default preserved (BR3/BR4): auto path subprocess.run mock asserted never-called in AC3 test.
+
+**Task wiki-rerank-claude T1-T7 complete → awaiting Evaluator**

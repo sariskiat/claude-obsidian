@@ -1284,7 +1284,7 @@
     "graph-semantic-bridge": {
       "title": "Semantic Bridge — Claude-Code Directions Report from the Graph",
       "status": "in_progress",
-      "phase": "plan",
+      "phase": "needs-retry",
       "problem_statement": "The heuristic graph-bridge.py ranks WHERE the white-space bridges are, but cannot reason about WHETHER they are any good, so there is no proposals.md-grade research-directions analysis generated from the graph.",
       "jtbd": "When I see ranked white-space bridges in my claim graph, I want Claude Code to read the grounded evidence plus my research situation and write a proposals.md-grade directions report (decision matrix, per-direction harsh takedown, execution probe), with every cited paper/entity verified against the real graph, so I can choose my next paper instead of hand-writing the analysis myself.",
       "problem_classification": "unique",
@@ -1356,80 +1356,80 @@
           "criterion": "Dossier assembly is deterministic and grounded: every candidate's anchor entities/papers exist in graph.db; dossier carries the citable allow-list. (no egress)",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k dossier 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k dossier 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "dossier suite green; live anchor entities/papers exist in graph.db (pytest -k dossier within 29 passed)"
         },
         {
           "id": "AC2",
           "criterion": "Prompt builder injects RESEARCH_PROFILE.md facts + proposals.md exemplar + bridge dossier + explicit citable allow-list + the FR7 section contract anchors (## The bar, ## Decision matrix, ### N. + Takedown, ## Ranking, ## Execution).",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k prompt 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k prompt 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "prompt builder injects profile+exemplar+dossier+allow-list+section contract (pytest -k prompt green)"
         },
         {
           "id": "AC3",
           "criterion": "Grounding gate accepts a clean fake report (cites subset of allow-list) -> saves file with 'N/N citations verified'; retries a dirty-then-clean fake and records the retry count in the audit footer. (faked --claude-cmd, offline)",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k grounding 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k grounding 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "clean-accept + dirty-then-clean retry proven — BUT only with ALL-CAPS FABRICATED-* fixtures; does not prove prose-case grounding"
         },
         {
           "id": "AC4",
           "criterion": "Hard-fail + retry cap: always-dirty fake -> after <=3 retries, non-zero exit + a .rejected.md artifact with the unverified cites flagged inline, and NO clean -directions.md saved.",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k cap_exhausted 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k cap_exhausted 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "always-dirty (ALL-CAPS) -> exit2 + .rejected.md + no clean save (pytest -k cap_exhausted green)"
         },
         {
           "id": "AC5",
           "criterion": "Source safety + no clobber: ~/Desktop/research/proposals.md is never written; output lands under wiki/graph/proposals/; a same-day rerun suffixes -2 (never overwrites).",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k no_clobber 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k no_clobber 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "BR4 source proposals.md untouched (mtime Jun 5); output under wiki/graph/proposals/; -2 suffix observed"
         },
         {
           "id": "AC6",
           "criterion": "Graceful degradation: missing db -> exit 1 + build hint; --claude-cmd binary absent -> non-zero + install/point hint (no file written); missing RESEARCH_PROFILE.md -> non-zero + create-it hint; missing proposals.md exemplar -> warn + proceed.",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k degrade 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k degrade 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "degrade paths green: missing db/profile/claude-cmd -> non-zero + hint (pytest -k degrade green)"
         },
         {
           "id": "AC7",
           "criterion": "Gold anchor available: the VTON x diffusion-sampling bridge appears in the candidate dossier by entity membership (not a hardcoded id) — reuses graph-bridge.build_proposals.",
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k gold_anchor 2>&1 | grep -qE '[1-9][0-9]* passed' && ! ( uv run python -m pytest tests/test_graph_propose.py -q -k gold_anchor 2>&1 | grep -qiE 'failed|error|no tests ran' )",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "gold VTON×diffusion bridge present by entity membership (pytest -k gold_anchor green)"
         },
         {
           "id": "AC8",
           "criterion": "No regression: make test-graph (44 passed / 4 skipped), make test-fulltext (45 passed — live baseline 2026-06-07, was 44 at graph-bridge plan time), make test-bridge (26 passed) stay green; graph-build.py byte-unmodified.",
           "verification": "make test-graph 2>&1 | grep -qE '44 passed' && make test-fulltext 2>&1 | grep -qE '45 passed' && make test-bridge 2>&1 | grep -qE '[1-9][0-9]* passed'",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "no regression: test-graph 44/4, test-fulltext 45, test-bridge 26 all green; protected core untouched by this feature (git diff ab291f8~1..HEAD empty)"
         },
         {
           "id": "AC9",
           "criterion": "Live evidence (evidence-only, not a unit test): one real claude -p run over the live graph yields a structurally-complete report (## The bar / a Decision matrix table / >=3 ### direction blocks each with a Takedown / ## Ranking / ## Execution probe) with an 'N/N citations verified' footer and 100% grounded cites; transcript saved to the overnight report.",
           "verification": "bash -c 'F=$(ls -t wiki/graph/proposals/*-directions.md 2>/dev/null | head -1); test -n \"$F\" && grep -qE \"## The bar\" \"$F\" && grep -qE \"^\\|\" \"$F\" && test $(grep -cE \"^### \" \"$F\") -ge 3 && grep -qiE \"Takedown\" \"$F\" && grep -qE \"## Ranking\" \"$F\" && grep -qE \"## Execution\" \"$F\" && grep -qE \"[0-9]+/[0-9]+ citations verified\" \"$F\"'",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "failed",
+          "evidence": "Eval#2 (heal e867b29): original named attack CLOSED (attack A exit 2) and vacuous-pass guard rejects pure-prose/zero-cite reports (attacks C/D/E exit 2). BUT BR1 still not enforced for MIXED reports: /tmp attack F (one real backtick cite + 'Spatial Memorization framework' + 'Garment Fidelity objective' + 'As Chen shows') saved a CLEAN exit-0 report footer '1/1 citations verified ✓' with all 3 fakes in the body. Two root causes: (1) _verify_citations:444 substring fallback certifies 8/16 plausible Title-Case fakes as grounded; (2) _extract_citations Tier3b suffix denylist misses 20/20 off-list suffixes + leading-capital article. Live directions-3.md is genuinely 20/20 grounded but by model compliance, not gate enforcement. AC9 grounding guarantee unmet -> needs-retry (1 left)."
         },
         {
           "id": "AC10",
           "criterion": "Wiring: commands/graph.md and skills/graph/SKILL.md both reference /graph propose -> graph-propose.py; make test-propose exists.",
           "verification": "bash -c \"grep -q 'graph-propose' commands/graph.md && grep -q 'graph-propose' skills/graph/SKILL.md && grep -qE '^test-propose:' Makefile\"",
           "expected_exit": 0,
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": "wiring present: commands/graph.md + skills/graph/SKILL.md reference graph-propose; make test-propose exists (29 passed)"
         }
       ],
       "tasks": [
@@ -1437,14 +1437,14 @@
           "id": "T1",
           "title": "Seed wiki/graph/RESEARCH_PROFILE.md (facts) from the research-goal-phd-paper memory note + the proposals.md header, and add wiki/graph/proposals/ to .gitignore decisions (track reports; the GENERATED reports stay git-tracked under wiki/graph/, only confirm no accidental ignore). Pure data/doc task, no engine. Closes the FR5 profile-seed prerequisite for AC2/AC6.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "done",
           "files": [
             "wiki/graph/RESEARCH_PROFILE.md",
             ".gitignore"
           ],
           "depends_on": [],
           "verification": "bash -c 'test -f wiki/graph/RESEARCH_PROFILE.md && grep -qiE \"first-author|top venue|PhD\" wiki/graph/RESEARCH_PROFILE.md && grep -qiE \"virtual try-on|VTON\" wiki/graph/RESEARCH_PROFILE.md && ! git check-ignore wiki/graph/proposals/x-directions.md'",
-          "evidence": [],
+          "evidence": "RESEARCH_PROFILE.md seeded; consumed by prompt builder",
           "scope_map": {
             "modify": [
               "wiki/graph/RESEARCH_PROFILE.md",
@@ -1461,7 +1461,7 @@
           "id": "T2",
           "title": "RED: write tests/test_graph_propose.py covering AC1-AC7 + AC10, all failing because scripts/graph-propose.py is absent. Build a tiny self-contained fixture graph.db (mirror tests/test_graph_bridge.py / test_graph_gaps.py style) AND a set of fixture --claude-cmd shell scripts under a tmp dir: (a) clean fixture echoing a report citing ONLY allow-list slugs/entities, (b) dirty-then-clean fixture (first invocation emits a fabricated cite, second is clean — keyed off a retry-count file), (c) always-dirty fixture. Tests assert: dossier determinism+grounding (AC1), prompt contains profile+exemplar+allow-list+section-contract anchors (AC2), grounding gate clean-accept + dirty-retry with footer retry count (AC3), cap-exhaustion -> non-zero + .rejected.md + no clean file (AC4), proposals.md never written + output under wiki/graph/proposals/ + same-day -2 suffix (AC5), missing-db/missing-claude/missing-profile degradation (AC6), gold-anchor by entity membership reusing build_proposals (AC7). OFFLINE + deterministic — no real claude egress. Confirm RED before any impl.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "done",
           "files": [
             "tests/test_graph_propose.py"
           ],
@@ -1469,7 +1469,7 @@
             "T1"
           ],
           "verification": "bash -c 'uv run python -m pytest tests/test_graph_propose.py -q 2>&1 | grep -qiE \"failed|error\" && ! uv run python -m pytest tests/test_graph_propose.py -q 2>&1 | grep -qE \"[1-9][0-9]* passed\"'",
-          "evidence": [],
+          "evidence": "dossier + allow-list assembly deterministic, grounded (AC1)",
           "scope_map": {
             "modify": [
               "tests/test_graph_propose.py"
@@ -1487,7 +1487,7 @@
           "id": "T3",
           "title": "GREEN dossier + allow-list: scripts/graph-propose.py imports graph-bridge.build_proposals(conn, top_n=K) (default K=12, --bridges flag) for candidates — import, never fork. For each candidate assemble a deterministic JSON-serializable dossier: anchor entities, anchor papers, limitation/open-question claims (claim_type IN ('limitation','open-question')), and full-text passages via graph-retrieve.py as a SUBPROCESS (note: graph-retrieve.py emits JSON to stdout unconditionally — there is NO --json flag; parse stdout exactly as graph-bridge._retrieve_passages_for_paper already does). Build the citable allow-list = exact set of paper slugs + entity names present in the dossier. Missing db -> exit 1 + build hint; graph index absent -> passage note, not crash. Makes T2 dossier (AC1) + gold_anchor (AC7) green.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "done",
           "files": [
             "scripts/graph-propose.py"
           ],
@@ -1495,7 +1495,7 @@
             "T2"
           ],
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k 'dossier or gold_anchor' 2>&1 | grep -qE '[1-9][0-9]* passed'",
-          "evidence": [],
+          "evidence": "prompt builder with section contract + allow-list (AC2)",
           "scope_map": {
             "modify": [
               "scripts/graph-propose.py"
@@ -1513,7 +1513,7 @@
           "id": "T4",
           "title": "GREEN prompt builder: assemble the prompt = system(harsh-advisor persona + the FR7 section contract literal anchors: '## The bar', '## Decision matrix' (a table), '### N.' per-direction blocks each with a 'Takedown' subsection, '## Ranking', '## Execution' probe + 'cite ONLY these' allow-list instruction) + wiki/graph/RESEARCH_PROFILE.md facts + ~/Desktop/research/proposals.md exemplar (read-only; missing -> warn + proceed without exemplar) + the per-candidate dossier + the explicit allow-list. Prompt is a pure deterministic string given a fixed dossier (testable, no egress). Makes T2 prompt (AC2) green.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "done",
           "files": [
             "scripts/graph-propose.py",
             "tests/test_graph_propose.py"
@@ -1522,7 +1522,7 @@
             "T3"
           ],
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k prompt 2>&1 | grep -qE '[1-9][0-9]* passed'",
-          "evidence": [],
+          "evidence": "grounding gate clean-accept + dirty-retry (AC3) — but extractor only sees ALL-CAPS + backtick spans",
           "scope_map": {
             "modify": [
               "scripts/graph-propose.py",
@@ -1539,7 +1539,7 @@
           "id": "T5",
           "title": "GREEN engine + grounding gate + retry + save: run headless claude -p via subprocess using --claude-cmd (default 'claude'; binary absent -> non-zero + install/point hint, NO file written). After each run, extract every cited slug/entity from the report and verify each is a real papers.slug or entities.name in graph.db AND is a subset of the dossier allow-list. Any unverified cite -> re-prompt emphasizing the offending cites, up to --retries (default 3). On clean pass: write wiki/graph/proposals/<YYYY-MM-DD>-directions.md (suffix -2/-3 if a same-day file exists; never clobber) with a grounding-audit footer ('N/N citations verified', retry count, model, bridge count). On cap exhaustion: write <...>-directions.rejected.md with unverified cites flagged inline, emit failing list to stderr, exit non-zero, NO clean report. ~/Desktop/research/proposals.md is never written. Makes T2 grounding (AC3) + cap_exhausted (AC4) + no_clobber (AC5) + degrade (AC6) green.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "done",
           "files": [
             "scripts/graph-propose.py",
             "tests/test_graph_propose.py"
@@ -1548,7 +1548,7 @@
             "T4"
           ],
           "verification": "uv run python -m pytest tests/test_graph_propose.py -q -k 'grounding or cap_exhausted or no_clobber or degrade' 2>&1 | grep -qE '[1-9][0-9]* passed'",
-          "evidence": [],
+          "evidence": "cap-exhaustion .rejected.md path (AC4)",
           "scope_map": {
             "modify": [
               "scripts/graph-propose.py",
@@ -1565,7 +1565,7 @@
           "id": "T6",
           "title": "Wire /graph propose: add the propose subcommand to commands/graph.md and routing to skills/graph/SKILL.md (both must reference graph-propose.py); add a 'test-propose' target to the Makefile (uv run python -m pytest tests/test_graph_propose.py -q); add a propose/RESEARCH_PROFILE.md/proposals-output note to wiki/graph/SCHEMA.md. Makes AC10 green.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "done",
           "files": [
             "commands/graph.md",
             "skills/graph/SKILL.md",
@@ -1576,7 +1576,7 @@
             "T5"
           ],
           "verification": "bash -c \"grep -q 'graph-propose' commands/graph.md && grep -q 'graph-propose' skills/graph/SKILL.md && grep -qE '^test-propose:' Makefile\"",
-          "evidence": [],
+          "evidence": "no-clobber + source safety + degrade (AC5/AC6)",
           "scope_map": {
             "modify": [
               "commands/graph.md",
@@ -1592,13 +1592,13 @@
           "id": "T7",
           "title": "VALIDATE no-regression + faked-engine full suite: make test-graph (44/4) + make test-fulltext (44) + make test-bridge stay green; graph-build.py byte-unmodified (git diff empty); full tests/test_graph_propose.py green offline with the faked --claude-cmd fixtures (clean-accept, dirty-retry, cap-reject all proven). Makes AC8 green + the test half of the metric.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "done",
           "files": [],
           "depends_on": [
             "T6"
           ],
           "verification": "bash -c 'make test-graph 2>&1 | grep -qE \"44 passed\" && make test-fulltext 2>&1 | grep -qE \"45 passed\" && make test-bridge 2>&1 | grep -qE \"[1-9][0-9]* passed\" && uv run python -m pytest tests/test_graph_propose.py -q 2>&1 | grep -qE \"[1-9][0-9]* passed\" && git diff --quiet scripts/graph-build.py'",
-          "evidence": [],
+          "evidence": "wiring + make test-propose (AC10); regression green (AC8)",
           "scope_map": {
             "modify": [],
             "read_only": [
@@ -1612,13 +1612,13 @@
           "id": "T8",
           "title": "VALIDATE live evidence (evidence-only, real egress, NOT a pytest): run one real `uv run python scripts/graph-propose.py` (default --claude-cmd claude) over the live .vault-meta/graph/graph.db. Confirm it writes wiki/graph/proposals/<today>-directions.md whose footer reads 'N/N citations verified', the section contract is present (## The bar / a decision-matrix table / >=3 ### direction blocks each with a Takedown / ## Ranking / ## Execution), and 100% of cites resolve to graph nodes. Save the transcript to the overnight report. Closes AC9 + the live half of the binary metric.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "failed",
           "files": [],
           "depends_on": [
             "T7"
           ],
           "verification": "bash -c 'F=$(ls -t wiki/graph/proposals/*-directions.md 2>/dev/null | head -1); test -n \"$F\" && grep -qE \"## The bar\" \"$F\" && grep -qE \"^\\|\" \"$F\" && test $(grep -cE \"^### \" \"$F\") -ge 3 && grep -qiE \"Takedown\" \"$F\" && grep -qE \"## Ranking\" \"$F\" && grep -qE \"## Execution\" \"$F\" && grep -qE \"[0-9]+/[0-9]+ citations verified\" \"$F\"'",
-          "evidence": [],
+          "evidence": "live evidence: report saved but grounding gate is theater — prose hallucination passes as verified; BR1 not enforced",
           "scope_map": {
             "modify": [
               "wiki/graph/proposals/"
@@ -1639,8 +1639,11 @@
         "technical": [],
         "product": [],
         "process": [],
-        "harness_updates": []
-      }
+        "harness_updates": [],
+        "evaluator_2026-06-07": "harness/product: a grounding gate whose extractor only surfaces ALL-CAPS + backtick tokens cannot reject a prose-case hallucination ('the Garment Diffusion Transfer paper'); adversarial fake engine produced a clean exit-0 '0/0 verified ✓' report with 3 fabricated cites. Tests were self-confirming (only fed ALL-CAPS FABRICATED-*). Fix: compel all cites into a checked form in the prompt AND assert prose/author-year hallucination is rejected in a test, OR broaden the verifier; also guard the 0/0 vacuous-pass."
+      },
+      "eval_attempts": 2,
+      "retries_remaining": 1
     }
   }
 }

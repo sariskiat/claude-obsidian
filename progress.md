@@ -108,3 +108,34 @@ T8 live evidence:
 
 Key deviation from board (grounding gate tuning):
 The citation extractor required 3 iterations to reach a stable design. The initial broad regex (any 2+-part hyphenated token) generated ~40 false positives from body prose. After switching to ALL-CAPS + backtick-span-only extraction, the live run produced 19 real citations (ALL-CAPS hallucination markers + backtick-quoted slugs), all verified. The gate correctly caught `HARD-PIN` (claude's abbreviation for "hard-pinning", not a real graph node) and `ALL-CAPS` (the word "ALL-CAPS" literally typed by claude in the re-prompted response), triggering 2 retries before the clean third pass.
+
+## 2026-06-07 — Evaluator: graph-semantic-bridge → needs-retry (grade: changes)
+
+Re-ran every AC by real execution. Green: test_graph_propose **29 passed**, make test-graph **44/4**, test-fulltext **45**, test-bridge **26**, make test-propose exists. Protected core (graph-build/bridge/retrieve/graph_db) byte-untouched by this feature. BR4 source `proposals.md` untouched. Security: no `fork/feature/graph-semantic-bridge` ref, no upstream — the blocked fork push never landed.
+
+**Headline — grounding gate (BR1) is theater.** The narrowed extractor (`_extract_citations`, only ALL-CAPS + backtick spans) never sees a prose-case citation. An adversarial fake engine produced a **clean exit-0 report** (`0/0 citations verified ✓`) containing three fabricated cites — "the Garment Diffusion Transfer paper", "Wang et al. 2024", "phantom-tryon-net" — none in `graph.db`. The dirty-cite tests only feed ALL-CAPS `FABRICATED-*`, so the blind spot is untested. The live report happens to be genuinely grounded (19/19 real backticked slugs, structurally complete) — but by the model's good behaviour, not gate enforcement. **AC9 + T8 fail.**
+
+Retry brief: compel all cites into a checked form in the prompt (FR4/FR7) and assert a prose hallucination is rejected in a test, OR broaden the verifier; guard the 0/0 vacuous pass. Also gitignore `*.rejected*.md` + drop the byte-identical duplicate `2026-06-07-directions-2.md`.
+
+## 2026-06-07 — Evaluator #2: graph-semantic-bridge → needs-retry (grade: changes; 1 retry left)
+
+Verified the heal (`e867b29`) by real execution + adversarial /tmp fake engines (not the Generator's own tests).
+
+Green / confirmed: test_graph_propose **38 passed**, test-graph **44/4**, test-fulltext **45**, test-bridge **26**; protected core (graph-build/bridge/retrieve/graph_db) byte-untouched by this feature's commits (last touched by their own features); BR4 `~/Desktop/research/proposals.md` mtime Jun 5 unchanged; no `fork/feature/graph-semantic-bridge` ref, no branch upstream; `.rejected*.md` now gitignored; no-clobber `-2` suffix works.
+
+What the heal DID close:
+- Original named attack: `the Garment Diffusion Transfer paper` + `Wang et al. 2024` + `phantom-tryon-net` → attack A exit 2, `.rejected.md` with inline `[UNVERIFIED]` flags. Regression closed.
+- Vacuous-pass guard: zero-citation / pure-prose reports rejected — attacks C (single-surname `As Chen shows`), D (bare prose `spatial memorization`), E (zero-cite non-empty) all exit 2. Probes 3/4/5 caught.
+- Live `directions-3.md` is genuinely 20/20 grounded (every backtick token resolves to a real `papers.slug`/`entities.name`) — but by model compliance with the backtick rule, not gate enforcement.
+
+Headline — BR1 still NOT enforced for MIXED reports (the hole is narrowed, not closed):
+- Attack F (proof, /tmp end-to-end): a report with ONE honest backtick cite + three prose hallucinations (`Spatial Memorization framework`, `Garment Fidelity objective`, `As Chen shows`) → **exit 0, saved CLEAN, footer `1/1 citations verified ✓`**, all 3 fakes still in the body. Vacuous guard is silent because one real cite exists.
+- Root cause 1 — verifier false-positive: `_verify_citations` line 444 bidirectional substring fallback (`cite in entity or entity in cite, len>8`) certifies 8/16 plausible Title-Case fakes as grounded (`Spatial Memorization`, `Spatial Encoder`, `Garment Net`, `Diffusion Sampler`, `Cross Attention`, `Flow Matching`, `Latent Diffusion`, `Garment Encoder`). The task's own probe-2 fail trigger ("Title-Case+framework slips trivially") is realized.
+- Root cause 2 — extractor coverage gap: Tier 3b suffix list is a 15-word denylist; 20/20 common research suffixes off it (`objective`, `loss`, `strategy`, `mechanism`, `algorithm`, `metric`, `dataset`, `technique`, `formulation`, …) make a Title-Case+suffix fake INVISIBLE; leading sentence-capital article (`The Spatial Memorization framework`) also escapes.
+- Tests calibrated to the known attack only (assert exactly `Wang et al. 2024` + an in-list-suffix non-colliding phrase). No test covers a db-colliding fake falsely verified, an off-list suffix, or a mixed real+fake report.
+
+Minor: audit footer `engine:` uses `<claude-cmd> --version` first line — robust on the real binary (`2.1.168 (Claude Code)`) but printed `engine: ## The bar` under a fake cmd. Live `directions-3.md` also leaked a model-narration sentence above the footer.
+
+BR5 clutter: 3 same-day clean reports tracked (`directions.md` 19/19, `directions-2.md` byte-dup, `directions-3.md` 20/20). Keep only `directions-3.md`; `git rm` the other two.
+
+Retry brief (attempt 3, final): make `_verify_citations` EXACT (exact slug / case-insensitive exact entity + the legit dangling-twin suffix rule only) — drop the bidirectional substring match; treat any un-backticked author-year or Title-Case+suffix token as unverified-by-default (flag, don't resolve); add a test asserting a MIXED report with a db-colliding prose fake is REJECTED (the BR1 contract, not one string); document the residual (un-backticked single-surname, no other signal) as a known limitation in the footer. Then `git rm` the two surplus clean reports.

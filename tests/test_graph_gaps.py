@@ -23,15 +23,16 @@ SCRIPTS = PROJECT_ROOT / "scripts"
 DERIVED_DB = PROJECT_ROOT / ".vault-meta" / "graph" / "graph.db"
 GAPS_SCRIPT = SCRIPTS / "graph-gaps.py"
 
-# Expected counts from oracle on derived db (verified 2026-06-06)
+# Expected counts post graph-resolve-apply 9-merge (2026-06-07)
+# was frontier=65, debate=0, replication=473, coverage=49, white-space=312, total=899 pre graph-resolve-apply 9-merge
 EXPECTED_COUNTS = {
-    "frontier": 65,
-    "debate": 0,
-    "replication": 473,
-    "coverage": 49,
-    "white-space": 312,
+    "frontier": 65,  # was 65 pre graph-resolve-apply 9-merge (unchanged)
+    "debate": 0,  # was 0 pre graph-resolve-apply 9-merge (unchanged)
+    "replication": 473,  # was 473 pre graph-resolve-apply 9-merge (unchanged)
+    "coverage": 45,  # was 49 pre graph-resolve-apply 9-merge; -4 from CFG/CrossAttn/DINOv2 merges
+    "white-space": 328,  # was 312 pre graph-resolve-apply 9-merge; +16 from entity consolidation
 }
-EXPECTED_TOTAL = 899
+EXPECTED_TOTAL = 911  # was 899 pre graph-resolve-apply 9-merge; net +12
 
 
 def _run_gaps(*args):

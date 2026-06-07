@@ -12930,9 +12930,9 @@
       "sub_type": "pretrained T2I model",
       "description": "Open-source latent diffusion T2I model (Rombach et al., 2022).",
       "source_paper": "enhanced-realism-in-virtual-try-on-tasks-using-diffusion-methods",
-      "canonical_id": null,
+      "canonical_id": 336,
       "metadata": null,
-      "merge_confidence": 0.95
+      "merge_confidence": 1.0
     },
     {
       "id": 935,
@@ -13414,9 +13414,9 @@
       "sub_type": "Image Synthesis",
       "description": "Task of digitally superimposing garments onto model images",
       "source_paper": "diffusiontrend-a-minimalist-approach-to-virtual-fashion-try-on",
-      "canonical_id": null,
+      "canonical_id": 914,
       "metadata": null,
-      "merge_confidence": null
+      "merge_confidence": 0.714
     },
     {
       "id": 1054,
@@ -16725,9 +16725,9 @@
       "sub_type": "conditional sampling",
       "description": "ε_CFG = ε_uncond + s·(ε_cond − ε_uncond). CatVTON uses 10% conditional dropout, s=2.5 optimal at inference. s>3.5 causes color distortion and high-frequency noise (Ho & Salimans, 2022).",
       "source_paper": "catvton-concatenation-is-all-you-need-for-virtual-try-on-with-diffusion-models",
-      "canonical_id": null,
+      "canonical_id": 730,
       "metadata": null,
-      "merge_confidence": 0.95
+      "merge_confidence": 1.0
     },
     {
       "id": 1355,
@@ -16857,9 +16857,9 @@
       "sub_type": "zero-shot object insertion",
       "description": "DINOv2+ControlNet for subject feature extraction (Chen et al., 2023). High-quality object-level customization referenced in related work.",
       "source_paper": "catvton-concatenation-is-all-you-need-for-virtual-try-on-with-diffusion-models",
-      "canonical_id": null,
+      "canonical_id": 1149,
       "metadata": null,
-      "merge_confidence": 0.95
+      "merge_confidence": 1.0
     },
     {
       "id": 1367,
@@ -16868,9 +16868,9 @@
       "sub_type": "pretrained vision encoder",
       "description": "Self-supervised ViT (Oquab et al., 2023). Used by other VTON methods as garment feature extractor. CatVTON argues pre-trained encoders are not optimized for detail preservation.",
       "source_paper": "catvton-concatenation-is-all-you-need-for-virtual-try-on-with-diffusion-models",
-      "canonical_id": null,
+      "canonical_id": 879,
       "metadata": null,
-      "merge_confidence": 0.95
+      "merge_confidence": 1.0
     },
     {
       "id": 1368,
@@ -17077,9 +17077,9 @@
       "sub_type": "conditional sampling",
       "description": "ε = ε_uncond + s·(ε_cond − ε_uncond). Balances conditional and unconditional predictions via guidance scale s. OOTDiffusion enables garment-aware CFG through outfitting dropout (Ho & Salimans, 2022).",
       "source_paper": "ootdiffusion-outfitting-fusion-based-latent-diffusion-for-controllable-virtual-try-on",
-      "canonical_id": null,
+      "canonical_id": 730,
       "metadata": null,
-      "merge_confidence": null
+      "merge_confidence": 0.833
     },
     {
       "id": 1387,
@@ -17088,9 +17088,9 @@
       "sub_type": "text/image conditioning",
       "description": "Standard LDM mechanism: CLIP text/image embeddings interact with UNet features via cross-attention layers. OOTDiffusion uses for auxiliary garment label and CLIP textual inversion embeddings.",
       "source_paper": "ootdiffusion-outfitting-fusion-based-latent-diffusion-for-controllable-virtual-try-on",
-      "canonical_id": null,
+      "canonical_id": 921,
       "metadata": null,
-      "merge_confidence": 0.95
+      "merge_confidence": 1.0
     },
     {
       "id": 1388,
@@ -17110,9 +17110,9 @@
       "sub_type": "denoising objective",
       "description": "L = E[||ϵ − ϵ_θ(z_t, t, τ_θ(y))||²]. Standard LDM training objective minimizing noise prediction error.",
       "source_paper": "ootdiffusion-outfitting-fusion-based-latent-diffusion-for-controllable-virtual-try-on",
-      "canonical_id": null,
+      "canonical_id": 1359,
       "metadata": null,
-      "merge_confidence": 0.95
+      "merge_confidence": 1.0
     },
     {
       "id": 1390,
@@ -17374,9 +17374,9 @@
       "sub_type": "pretrained vision-language model",
       "description": "Contrastive Language-Image Pretraining (Radford et al., 2021). Used for garment feature extraction and text conditioning in VTON.",
       "source_paper": "texture-preserving-diffusion-models-for-high-fidelity-virtual-try-on",
-      "canonical_id": null,
+      "canonical_id": 1368,
       "metadata": null,
-      "merge_confidence": null
+      "merge_confidence": 0.833
     },
     {
       "id": 1414,

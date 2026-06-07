@@ -1,6 +1,6 @@
 ---
 name: graph
-description: "Claim-centric knowledge graph for the Compound Vault (v1.10 Graphbuilding Fusion). The claim is the atom — a typed, signed, quoted proposition — so the vault can answer questions no page-model organizer can: 'Paper A asserts X, Paper B refutes X', replication counts, and the five research-gap species (frontier / debate / replication / coverage / white-space). Markdown under wiki/graph/ is the source of truth; a sqlite index is derived and throwaway. Full-paper retrieval via /graph read uses BM25+rerank over wiki/graph/papers/*.full.md. Bridge proposals via /graph bridge (graph-bridge.py) rank white-space community pairs into justified next-paper candidates grounded in the real graph. Migrated natively from the standalone graphbuilding skill — zero oracle dependency. Triggers on: knowledge graph, claim graph, research gaps, what should I study next, find connections across papers, cross-paper, bridge proposals, next paper, white-space bridge, ingest this paper into the graph, graph build, graph gaps, graph resolve, graph read, graph bridge, read paper, retrieve passage, full text, duplicate entities, dedup entities, gap scan, my graph, /graph."
+description: "Claim-centric knowledge graph for the Compound Vault (v1.10 Graphbuilding Fusion). The claim is the atom — a typed, signed, quoted proposition — so the vault can answer questions no page-model organizer can: 'Paper A asserts X, Paper B refutes X', replication counts, and the five research-gap species (frontier / debate / replication / coverage / white-space). Markdown under wiki/graph/ is the source of truth; a sqlite index is derived and throwaway. Full-paper retrieval via /graph read uses BM25+rerank over wiki/graph/papers/*.full.md. Bridge proposals via /graph bridge (graph-bridge.py) rank white-space community pairs into justified next-paper candidates grounded in the real graph. Directions report via /graph propose (graph-propose.py) writes a grounded proposals.md-grade analysis from the bridge dossier via headless claude -p with a grounding gate. Migrated natively from the standalone graphbuilding skill — zero oracle dependency. Triggers on: knowledge graph, claim graph, research gaps, what should I study next, find connections across papers, cross-paper, bridge proposals, next paper, white-space bridge, propose directions, directions report, research directions, graph propose, ingest this paper into the graph, graph build, graph gaps, graph resolve, graph read, graph bridge, read paper, retrieve passage, full text, duplicate entities, dedup entities, gap scan, my graph, /graph."
 allowed-tools: Read Bash
 ---
 
@@ -151,6 +151,46 @@ richness: 0.15, direction_relevance: 0.25}`; retune at runtime via `--w-<signal>
 `contextual-prefix.pick_prefix_tier`; falls back to structured template if claude is absent).
 
 **Tests:** `make test-bridge` or `uv run python -m pytest tests/test_graph_bridge.py -q`.
+
+### 7. Generate a grounded directions report from the graph (P6 — Semantic Bridge)
+`/graph propose` (scripts/graph-propose.py) turns the top bridge proposals + your research
+profile into a `proposals.md`-grade directions report written by headless `claude -p`, with
+every cited paper/entity verified against `graph.db`.
+
+```bash
+# Full run — saves wiki/graph/proposals/YYYY-MM-DD-directions.md
+uv run python scripts/graph-propose.py
+
+# Inspect dossier (no claude call; prints JSON to stdout)
+uv run python scripts/graph-propose.py --dry-run-dossier-only
+
+# Inspect prompt (no claude call; prints prompt to stdout)
+uv run python scripts/graph-propose.py --dry-run-prompt
+```
+
+**Pipeline:**
+1. `graph-bridge.build_proposals(conn, top_n=K)` — top-K candidates (imported, never forked).
+2. Dossier per candidate: anchor entities + papers, limitation/open-question claims,
+   full-text passages via `graph-retrieve.py` subprocess.
+3. Allow-list = exact set of slugs + entity names in the dossier. Injected into the prompt
+   with "cite ONLY these."
+4. `claude -p` (headless) writes the report.
+5. Grounding gate: extract citations → verify ⊆ allow-list/db → re-prompt if dirty (≤3x).
+6. Clean pass → `wiki/graph/proposals/YYYY-MM-DD-directions.md` + audit footer
+   (`N/N citations verified ✓`, retry count, model, bridge count).
+   Cap exhausted → `.rejected.md` + non-zero exit.
+
+**Safety:** `~/Desktop/research/proposals.md` is read-only exemplar; never written.
+Same-day reruns suffix `-2/-3`; never clobber.
+Required report sections: `## The bar`, `## Decision matrix` (table), `### N.` direction
+blocks each with a `**Takedown**`, `## Ranking`, `## Execution`.
+
+**Inputs required:**
+- `wiki/graph/RESEARCH_PROFILE.md` (seeded from the research-goal-phd-paper memory note).
+- `.vault-meta/graph/graph.db` (run `graph-build.py` first).
+- `claude` on PATH (or `--claude-cmd /path/to/claude`).
+
+**Tests:** `make test-propose` or `uv run python -m pytest tests/test_graph_propose.py -q`.
 
 ---
 

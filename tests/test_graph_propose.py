@@ -232,14 +232,16 @@ def _fixture_db_path(tmp_path: Path) -> Path:
 # Fake engine shell scripts (for --claude-cmd)
 # ---------------------------------------------------------------------------
 
-def _write_clean_engine(tmp_path: Path, allow_list_slugs: list) -> Path:
+def _write_clean_engine(tmp_path: Path, allow_list_slugs: list, name: str = "clean_engine.sh") -> Path:
     """Write a shell script that emits a clean (allow-list-only) report.
 
     The report contains the mandatory section contract and cites only
     allow-list slugs/entities so the grounding gate accepts it on first try.
+    The optional name parameter lets callers write multiple distinct engines
+    to the same tmp_path without collisions.
     """
     slugs_in_report = " ".join(allow_list_slugs[:2]) if allow_list_slugs else "vton-paper aek-paper"
-    script = tmp_path / "clean_engine.sh"
+    script = tmp_path / name
     script.write_text(f"""#!/bin/bash
 # Fake clean engine: cites only known allow-list slugs.
 cat <<'REPORT'
@@ -874,10 +876,10 @@ class TestNoClobber:
         reports = list(proposals_dir.glob("*-directions.md"))
         assert len(reports) >= 1, f"No report in {proposals_dir}"
 
-    def test_no_clobber_same_day_suffix(self, fixture_db, proposals_dir, clean_engine, tmp_path):
+    def test_no_clobber_same_day_suffix(self, fixture_db, proposals_dir, tmp_path):
         """A second same-day run must produce a -2 suffixed file, not clobber."""
-        engine1 = _write_clean_engine(tmp_path, ["vton-paper", "aek-paper"])
-        engine2 = _write_clean_engine(tmp_path, ["vton-paper"])
+        engine1 = _write_clean_engine(tmp_path, ["vton-paper", "aek-paper"], "engine1.sh")
+        engine2 = _write_clean_engine(tmp_path, ["vton-paper"], "engine2.sh")
 
         rc1, _, err1 = _run_propose(
             "--db", str(fixture_db),
@@ -887,21 +889,24 @@ class TestNoClobber:
         )
         assert rc1 == 0, f"First run failed: {err1}"
 
-        rc2, _, err2 = _run_propose(
+        rc2, out2, err2 = _run_propose(
             "--db", str(fixture_db),
             "--output-dir", str(proposals_dir),
             "--profile", str(PROFILE_PATH),
             "--claude-cmd", str(engine2),
         )
-        assert rc2 == 0, f"Second run failed: {err2}"
+        assert rc2 == 0, f"Second run failed (rc={rc2}): {err2}"
 
-        reports = sorted(proposals_dir.glob("*-directions.md"))
+        # Glob for all direction reports (including suffixed ones like -directions-2.md)
+        reports = sorted(proposals_dir.glob("*directions*.md"))
+        # Filter out .rejected.md
+        reports = [r for r in reports if "rejected" not in r.name]
         assert len(reports) >= 2, \
             f"Expected >=2 reports after two runs, found {[r.name for r in reports]}"
 
         # The second report must have a -2 suffix (or similar non-clobber suffix)
         names = [r.name for r in reports]
-        has_suffix = any("-2" in n or "-2." in n or n.endswith("-2.md") for n in names)
+        has_suffix = any("-2" in n for n in names)
         assert has_suffix, f"No -2 suffixed report found: {names}"
 
 

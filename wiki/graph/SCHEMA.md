@@ -136,3 +136,53 @@ is idempotent and lossless — suitable for running after every ingest.
    `predicate: part-of`, `object_id: 3`.
 4. Run `uv run python scripts/graph-build.py wiki/graph/ .vault-meta/graph/graph.db`
    — the derived index is rebuilt with the new paper/entity/claim.
+
+---
+
+## Semantic Bridge — directions report output (P6, graph-propose.py)
+
+`/graph propose` (scripts/graph-propose.py) generates a `proposals.md`-grade research
+directions report grounded in the real graph. The output lands under:
+
+```
+wiki/graph/proposals/YYYY-MM-DD-directions.md   ← clean accepted report
+wiki/graph/proposals/YYYY-MM-DD-directions-2.md ← same-day rerun (never clobbers)
+wiki/graph/proposals/YYYY-MM-DD-directions.rejected.md ← cap-exhausted artifact
+```
+
+These files are **git-tracked** (not gitignored). They are the evidence of a grounded
+LLM analysis run, so they belong in version control.
+
+### Required report sections (FR7 section contract)
+
+The grounding gate and AC9 grep check for these headers in every accepted report:
+
+- `## The bar` — harsh honest assessment of what it takes to earn the PhD ticket
+- `## Decision matrix` — a markdown table with ceiling/odds/theory/scoop columns
+- `### N.` — one block per direction (minimum 3), each containing `**Takedown:**`
+- `## Ranking` — ordered ranking with rationale + fork rule
+- `## Execution` — first-week concrete proof-of-concept probe with gate condition
+
+### Grounding audit footer
+
+Every accepted report ends with:
+
+```
+*Grounding audit: N/N citations verified ✓ | retries: R | model: M | bridge candidates: K*
+```
+
+N = total citations extracted, all verified against `graph.db`. The gate rejects any
+report where any citation is not in `papers.slug` or `entities.name`.
+
+### RESEARCH_PROFILE.md
+
+`wiki/graph/RESEARCH_PROFILE.md` is the user-owned profile injected into every prompt.
+It encodes: goal (top-venue first-author paper → PhD ticket), strength/gap profile,
+the 5 ranked directions, the fork rule, the Aek phase rule (no email until 4 deep-reads).
+Seeded from the `research-goal-phd-paper` memory note at feature build time.
+Edit it directly to update the research context.
+
+### Source exemplar
+
+`~/Desktop/research/proposals.md` is the style exemplar — the hand-written proposals.md
+that establishes the genre and tone. It is **read-only**; graph-propose.py never writes to it.

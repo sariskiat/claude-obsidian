@@ -58,6 +58,27 @@ Read the `graph` skill (`skills/graph/SKILL.md`). Then route on `$ARGUMENTS`:
   Default run: zero egress (`--synthesize` is the only opt-in egress path).
   Missing db → non-zero exit with "run graph-build.py" hint.
 
+- **propose** — Run the Semantic Bridge: assemble a dossier from the top bridge proposals,
+  build a prompt with your RESEARCH_PROFILE.md + the proposals.md exemplar, call `claude -p`
+  (headless), verify every citation against graph.db (grounding gate, up to 3 retries), and
+  save a timestamped proposals.md-grade directions report to `wiki/graph/proposals/`.
+  ```bash
+  # Full run (writes wiki/graph/proposals/YYYY-MM-DD-directions.md)
+  uv run python scripts/graph-propose.py
+  # Inspect dossier only (no claude call, prints JSON)
+  uv run python scripts/graph-propose.py --dry-run-dossier-only
+  # Inspect assembled prompt (no claude call)
+  uv run python scripts/graph-propose.py --dry-run-prompt
+  # Custom claude binary or more bridges
+  uv run python scripts/graph-propose.py --claude-cmd /path/to/claude --bridges 15
+  ```
+  The grounding gate extracts every cited slug/entity from the report and verifies each
+  against `graph.db`. Any unverified citation → re-prompt (emphasizing offending cites) up
+  to `--retries` (default 3). On clean pass: writes `YYYY-MM-DD-directions.md` with a footer
+  `N/N citations verified ✓`. On cap exhaustion: writes `.rejected.md` + non-zero exit.
+  `~/Desktop/research/proposals.md` is read-only input; never written.
+  Tests: `make test-propose`.
+
 - **export** `<source.db>` — Re-export a sqlite graph into `wiki/graph/` markdown + snapshot
   (reads a copy, never mutates the source):
   `uv run python scripts/graph-export.py <source.db> wiki/graph`

@@ -3,7 +3,7 @@
 
 .PHONY: test test-address test-tiling test-boundary test-bm25 test-retrieve \
         test-lock test-concurrent test-mode test-contextual test-graph test-fulltext \
-        test-bridge validate-graph setup-dragonscale setup-retrieve setup-mode \
+        test-bridge test-propose validate-graph setup-dragonscale setup-retrieve setup-mode \
         clean-test-state help
 
 help:
@@ -21,6 +21,7 @@ help:
 	@echo "  make test-graph       graph fusion round-trip + gaps + resolve + validate (uv, needs PyYAML+networkx)"
 	@echo "  make test-fulltext    P4 full-paper retrieval suite (uv, hermetic)"
 	@echo "  make test-bridge      P5 bridge proposal suite (uv, hermetic + live gold anchor)"
+	@echo "  make test-propose     P6 semantic bridge / directions report suite (uv, hermetic)"
 	@echo "  make validate-graph   rebuild derived index + run the integrity guard (read-only)"
 	@echo "  make setup-dragonscale Run bin/setup-dragonscale.sh against this vault"
 	@echo "  make setup-retrieve   Run bin/setup-retrieve.sh against this vault (opt-in v1.7)"
@@ -78,6 +79,10 @@ test-fulltext:
 test-bridge:
 	@echo "=== P5 bridge proposal suite (uv) ==="
 	@uv run python -m pytest tests/test_graph_bridge.py -q
+
+test-propose:
+	@echo "=== P6 semantic bridge / directions report suite (uv) ==="
+	@uv run python -m pytest tests/test_graph_propose.py -q
 
 validate-graph:
 	@echo "=== graph integrity guard (read-only) ==="

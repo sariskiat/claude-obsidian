@@ -324,14 +324,26 @@ def _build_prompt(
 # ---------------------------------------------------------------------------
 
 _CITATION_STOPLIST = frozenset([
-    # Common English multi-word compound modifiers that are never paper slugs
+    # Common English multi-word compound modifiers that are never paper slugs.
+    # These appear in body prose but look like slugs to the regex.
     "as-a-feature", "as-a-resource", "as-a-service", "as-a-tool",
     "appearance-versus-motion", "appearance-vs-motion", "appearance-vs-temporal",
     "proof-of-concept", "state-of-the-art", "end-to-end", "plug-and-play",
     "one-size-fits-all", "case-by-case", "step-by-step", "side-by-side",
     "patch-for-patch", "pixel-for-pixel", "one-to-one", "one-to-many",
     "compression-of-conditioning", "generation-of-conditioning",
-    "bits-survived", "clean-exec",
+    "bits-survived", "clean-exec", "boundary-locus",
+    # Research/statistics modifiers
+    "memorize-versus-create", "memorise-versus-create",
+    "first-order-collapse", "second-order-collapse",
+    "high-relevance-score", "low-relevance-score",
+    "order-of-convergence", "rate-of-convergence",
+    "data-processing-inequality", "information-processing-inequality",
+    "tractable-but-low-signal", "tractable-but-high-signal",
+    "why-diffusion-models-don-t-memorize", "why-diffusion-models-dont-memorize",
+    "hard-to-reproduce", "easy-to-reproduce", "hard-to-verify",
+    "not-in-graph", "already-proposed", "theory-co-author",
+    "co-author", "deep-read", "deep-reads",
 ])
 
 

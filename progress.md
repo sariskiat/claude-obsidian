@@ -217,3 +217,24 @@ AC status (verified):
 Zero-egress default preserved (BR3/BR4): auto path subprocess.run mock asserted never-called in AC3 test.
 
 **Task wiki-rerank-claude T1-T7 complete → awaiting Evaluator**
+
+---
+
+## wiki-rerank-claude — Evaluator (PASS) — 2026-06-07
+
+Independent verification of Generator commit `d5b4a87` by REAL OS execution (no code-reading as evidence). Git note `grade: pass` attached.
+
+Board ACs (all run verbatim, all exit 0):
+- AC1-AC6, AC10: `python3 tests/test_retrieve.py` exit 0, 43/43 `OK` lines; every board grep string present. AC6 elapsed **1.74s** (<10s).
+- AC7 `make test-retrieve` exit 0. AC8 `make test-graph` exit 0 — **44 passed / 4 skipped** (baseline held, no regression).
+- AC9 `--peek` -> `rerank_tier=auto`; `RERANK_TIER=claude` variant -> `rerank_tier=claude`.
+
+Spec hard postures (independently proven, beyond board mocks):
+- **BR3/BR4 zero-egress** — a sentinel-recording real `fake_claude` (touches a file if ever invoked) was NEVER created on default retrieve, `--rerank-tier auto`, `rerank()` default kwargs, or env-unset path; created **exactly once** only on explicit `--rerank-tier claude`. Control case confirms the probe is live, not dead.
+- **BR9 prompt grounding** — captured the exact stdin prompt: it holds only query + chunk_ids + snippets (cap verified at [200,14] chars + ellipsis). Seeded absolute secret path, `page_path`, `page_address`, `.md` suffix — none leak.
+- **BR6/BR8/BR10** — failure sources (`claude-not-found`/`claude-error`/`claude-parse-error`), empty-array -> BM25 order, caller never raises; scoring `1/(rank+1)` exact (1.0, 0.5) + appended 0.0; explicit `auto` beats env `claude`.
+- **FR8** — graph-retrieve.py opt-in calls fake claude; default path does NOT. Both consumers document both flags in `--help`.
+
+Scope clean: only `scripts/{rerank,retrieve,graph-retrieve}.py` + `tests/test_retrieve.py` changed. `bm25-index.py`, `graph-propose.py`, `pyproject.toml`, `uv.lock` untouched. No new deps. Cosine+noop paths intact.
+
+Board: phase -> **passing**, status -> **completed**; AC1-AC10 -> done; T1-T7 -> completed. User acceptance: pending_human.

@@ -277,6 +277,13 @@ def main():
                         help="BM25 candidate count (pre-rerank)")
     parser.add_argument("--no-rerank", action="store_true",
                         help="Skip rerank; return BM25 order")
+    parser.add_argument("--rerank-tier", default=None, dest="rerank_tier",
+                        choices=["auto", "claude"],
+                        help="Reranker tier: 'auto' (cosine->noop) or 'claude' "
+                             "(claude -p reranker). Default: RERANK_TIER env var or 'auto'.")
+    parser.add_argument("--claude-cmd", default="claude", dest="claude_cmd",
+                        help="claude binary name or path (default: 'claude'). "
+                             "Used with --rerank-tier claude.")
 
     args = parser.parse_args()
 
@@ -394,11 +401,15 @@ def main():
             c["rerank_score"] = c.get("bm25_score", 0.0)
             c["rerank_source"] = "skipped"
     else:
+        import os as _os
+        effective_tier = args.rerank_tier or _os.environ.get("RERANK_TIER", "auto")
         reranker = import_sibling("rerank", "rerank.py")
         try:
             final = reranker.rerank(
                 effective_query, candidates, top_k=args.top,
                 allow_remote=False,
+                rerank_tier=effective_tier,
+                claude_cmd=args.claude_cmd,
             )
         except Exception as e:
             log(f"rerank failed ({e}); falling back to BM25 order")

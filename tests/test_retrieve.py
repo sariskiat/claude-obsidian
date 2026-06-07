@@ -319,6 +319,222 @@ def test_no_rerank_flag_strategy_bm25_only():
                   first.get("bm25_score"), first.get("rerank_score"))
 
 
+# ─── claude tier tests ────────────────────────────────────────────────────────
+
+def _make_fake_claude_exe(tmp_dir: Path, response_json: str) -> Path:
+    """Write a shell script that acts as a fake 'claude -p' command.
+
+    The script reads stdin (the prompt) and writes response_json to stdout.
+    Accepts any arguments so it mirrors the real `claude -p` invocation.
+    """
+    exe = tmp_dir / "fake_claude"
+    exe.write_text(
+        "#!/bin/sh\n"
+        f"echo '{response_json}'\n"
+    )
+    exe.chmod(0o755)
+    return exe
+
+
+def _make_never_called_claude_exe(tmp_dir: Path) -> Path:
+    """Write a shell script that exits 1 with an error if ever called."""
+    exe = tmp_dir / "fake_claude_never"
+    exe.write_text(
+        "#!/bin/sh\n"
+        "echo 'FORBIDDEN: claude called on default path' >&2\n"
+        "exit 1\n"
+    )
+    exe.chmod(0o755)
+    return exe
+
+
+def test_claude_tier_reorders_by_given_ids():
+    """AC1: fake claude returns permuted order of real ids; output order must match."""
+    candidates = [
+        {"chunk_id": "c-aaa:0", "score": 9.0, "path": "x"},
+        {"chunk_id": "c-bbb:0", "score": 8.0, "path": "x"},
+        {"chunk_id": "c-ccc:0", "score": 7.0, "path": "x"},
+    ]
+    # fake claude returns reversed order
+    permuted = '["c-ccc:0","c-bbb:0","c-aaa:0"]'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fake = _make_fake_claude_exe(Path(tmpdir), permuted)
+        out = rerank.rerank_claude("test query", candidates, top_k=3,
+                                   claude_cmd=str(fake))
+    ids = [c["chunk_id"] for c in out]
+    assert_eq("claude tier reorders by given ids",
+              ["c-ccc:0", "c-bbb:0", "c-aaa:0"], ids)
+
+
+def test_claude_tier_drops_invented_ids():
+    """AC2: out-of-set ids are silently dropped; remainder fills from BM25 order."""
+    candidates = [
+        {"chunk_id": "c-111:0", "score": 5.0, "path": "x"},
+        {"chunk_id": "c-222:0", "score": 4.0, "path": "x"},
+    ]
+    # fake claude returns one real id + one invented
+    resp = '["c-111:0","c-INVENTED:0"]'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fake = _make_fake_claude_exe(Path(tmpdir), resp)
+        out = rerank.rerank_claude("test query", candidates, top_k=2,
+                                   claude_cmd=str(fake))
+    ids = [c["chunk_id"] for c in out]
+    assert_true("claude tier drops invented ids: count == input",
+                len(out) == 2, hint=f"ids={ids}")
+    assert_true("claude tier drops invented ids: c-INVENTED absent",
+                "c-INVENTED:0" not in ids, hint=f"ids={ids}")
+    assert_true("claude tier drops invented ids: c-111 present",
+                "c-111:0" in ids, hint=f"ids={ids}")
+    print("OK   claude tier drops invented ids")
+
+
+def test_default_path_no_claude_call():
+    """AC3: rerank_tier='auto' must never call claude subprocess."""
+    candidates = [
+        {"chunk_id": "c-001:0", "score": 7.5, "path": "fake/p1.json"},
+    ]
+    import unittest.mock as _mock
+    with unittest.mock.patch.object(rerank, "ollama_alive", return_value=(False, [])):
+        with _mock.patch("subprocess.run") as mock_run:
+            rerank.rerank("query", candidates, top_k=5, rerank_tier="auto")
+            assert_true("default path no claude call",
+                        not mock_run.called,
+                        hint=f"subprocess.run called {mock_run.call_count} times")
+
+
+def test_retrieve_cli_claude_tier_strategy():
+    """AC4: retrieve.py --rerank-tier claude with fake claude; strategy contains 'claude'."""
+    import hashlib
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sandbox = Path(tmpdir)
+        (sandbox / "scripts").mkdir()
+        meta = sandbox / ".vault-meta"
+        chunks_dir = meta / "chunks"
+        bm25_dir = meta / "bm25"
+        chunks_dir.mkdir(parents=True)
+        bm25_dir.mkdir(parents=True)
+        import shutil
+        for f in ["retrieve.py", "bm25-index.py", "rerank.py"]:
+            shutil.copy(ROOT / "scripts" / f, sandbox / "scripts" / f)
+            os.chmod(sandbox / "scripts" / f, 0o755)
+        # One synthetic chunk
+        (chunks_dir / "c-cli01").mkdir()
+        (chunks_dir / "c-cli01" / "chunk-000.json").write_text(json.dumps({
+            "schema_version": 1, "page_path": "wiki/fake/c-cli01.md",
+            "page_address": "c-cli01", "chunk_index": 0,
+            "raw_text": "attention mechanism efficiency transformer",
+            "contextualized_text": "attention mechanism efficiency transformer",
+            "prefix": "", "prefix_source": "synthetic", "char_count": 41,
+            "body_hash": "sha256:" + hashlib.sha256(
+                b"attention mechanism efficiency transformer").hexdigest(),
+            "page_body_hash": "sha256:0", "created_at": "2026-05-17T00:00:00Z",
+        }))
+        subprocess.run([sys.executable, str(sandbox / "scripts" / "bm25-index.py"), "build"],
+                       capture_output=True, timeout=10, check=True)
+
+        # fake claude that returns the single real id
+        fake_exe = sandbox / "fake_claude"
+        fake_exe.write_text(
+            "#!/bin/sh\n"
+            'echo \'["c-cli01:0"]\'\n'
+        )
+        fake_exe.chmod(0o755)
+
+        result = subprocess.run(
+            [sys.executable, str(sandbox / "scripts" / "retrieve.py"),
+             "attention mechanism", "--top", "1",
+             "--rerank-tier", "claude", "--claude-cmd", str(fake_exe)],
+            capture_output=True, text=True, timeout=15,
+        )
+        assert_eq("retrieve CLI claude tier strategy: exit 0", 0, result.returncode)
+        out = json.loads(result.stdout)
+        assert_true("retrieve CLI claude tier strategy",
+                    "claude" in out.get("strategy", ""),
+                    hint=f"strategy={out.get('strategy')!r}")
+
+
+def test_fallback_ladder():
+    """AC5: auto+no-ollama -> noop-no-ollama; claude+fake-ok -> claude:...; claude+fail -> claude-error."""
+    candidates = [
+        {"chunk_id": "c-x:0", "score": 5.0, "path": "x"},
+    ]
+    # auto + no ollama -> noop-no-ollama
+    with unittest.mock.patch.object(rerank, "ollama_alive", return_value=(False, [])):
+        out = rerank.rerank("q", candidates[:], top_k=5, rerank_tier="auto")
+        assert_eq("fallback ladder: auto+no-ollama -> noop-no-ollama",
+                  "noop-no-ollama", out[0]["rerank_source"])
+
+    # claude + fake-ok -> source contains 'claude'
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fake = _make_fake_claude_exe(Path(tmpdir), '["c-x:0"]')
+        out2 = rerank.rerank("q", [{"chunk_id": "c-x:0", "score": 5.0, "path": "x"}],
+                             top_k=5, rerank_tier="claude", claude_cmd=str(fake))
+        assert_true("fallback ladder: claude+fake-ok -> source starts with claude",
+                    out2[0]["rerank_source"].startswith("claude"),
+                    hint=f"source={out2[0]['rerank_source']!r}")
+
+    # claude + failing cmd -> claude-error
+    with tempfile.TemporaryDirectory() as tmpdir:
+        bad = Path(tmpdir) / "bad_claude"
+        bad.write_text("#!/bin/sh\nexit 1\n")
+        bad.chmod(0o755)
+        out3 = rerank.rerank("q", [{"chunk_id": "c-x:0", "score": 5.0, "path": "x"}],
+                             top_k=5, rerank_tier="claude", claude_cmd=str(bad))
+        assert_eq("fallback ladder", "claude-error", out3[0]["rerank_source"])
+
+
+def test_no_rerank_beats_claude_tier():
+    """AC10: --no-rerank wins over --rerank-tier claude; fake claude never called."""
+    import hashlib
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sandbox = Path(tmpdir)
+        (sandbox / "scripts").mkdir()
+        meta = sandbox / ".vault-meta"
+        chunks_dir = meta / "chunks"
+        bm25_dir = meta / "bm25"
+        chunks_dir.mkdir(parents=True)
+        bm25_dir.mkdir(parents=True)
+        import shutil
+        for f in ["retrieve.py", "bm25-index.py", "rerank.py"]:
+            shutil.copy(ROOT / "scripts" / f, sandbox / "scripts" / f)
+            os.chmod(sandbox / "scripts" / f, 0o755)
+        # One synthetic chunk
+        (chunks_dir / "c-nrb01").mkdir()
+        (chunks_dir / "c-nrb01" / "chunk-000.json").write_text(json.dumps({
+            "schema_version": 1, "page_path": "wiki/fake/c-nrb01.md",
+            "page_address": "c-nrb01", "chunk_index": 0,
+            "raw_text": "no rerank beats claude tier test",
+            "contextualized_text": "no rerank beats claude tier test",
+            "prefix": "", "prefix_source": "synthetic", "char_count": 32,
+            "body_hash": "sha256:" + hashlib.sha256(
+                b"no rerank beats claude tier test").hexdigest(),
+            "page_body_hash": "sha256:0", "created_at": "2026-05-17T00:00:00Z",
+        }))
+        subprocess.run([sys.executable, str(sandbox / "scripts" / "bm25-index.py"), "build"],
+                       capture_output=True, timeout=10, check=True)
+
+        # fake claude that would fail if called
+        never_exe = sandbox / "never_claude"
+        never_exe.write_text(
+            "#!/bin/sh\n"
+            "echo 'FORBIDDEN: claude called when --no-rerank active' >&2\n"
+            "exit 1\n"
+        )
+        never_exe.chmod(0o755)
+
+        result = subprocess.run(
+            [sys.executable, str(sandbox / "scripts" / "retrieve.py"),
+             "no rerank", "--top", "1",
+             "--no-rerank", "--rerank-tier", "claude",
+             "--claude-cmd", str(never_exe)],
+            capture_output=True, text=True, timeout=15,
+        )
+        assert_eq("no-rerank beats claude tier: exit 0", 0, result.returncode)
+        out = json.loads(result.stdout)
+        assert_eq("no-rerank beats claude tier",
+                  "bm25-only", out.get("strategy"))
+
+
 def main():
     print("=== test_retrieve.py ===")
     test_import_sibling_resolves_hyphenated_names()
@@ -336,6 +552,13 @@ def main():
     test_end_to_end_with_synthetic_chunks()
     test_explain_flag_adds_diagnostics_block()
     test_no_rerank_flag_strategy_bm25_only()
+    # claude-tier tests (T1 — should be RED before implementation)
+    test_claude_tier_reorders_by_given_ids()
+    test_claude_tier_drops_invented_ids()
+    test_default_path_no_claude_call()
+    test_retrieve_cli_claude_tier_strategy()
+    test_fallback_ladder()
+    test_no_rerank_beats_claude_tier()
     print("\nAll retrieve tests passed.")
 
 

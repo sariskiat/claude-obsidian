@@ -47,6 +47,7 @@ import json
 import math
 import os
 import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -195,10 +196,141 @@ def load_chunk(chunk_rel_path):
         return None
 
 
-def rerank(query, candidates, top_k=5, allow_remote=False):
+def rerank_claude(query, candidates, top_k=5, claude_cmd="claude"):
+    """Call claude -p to reorder candidates by semantic relevance.
+
+    Builds a grounded prompt (query + per-candidate chunk_id + snippet <=200 chars),
+    calls subprocess.run([claude_cmd, '-p'], input=prompt, timeout=60),
+    parses the returned JSON array of chunk_ids.
+
+    BR1: only reorders; no new ids invented.
+    BR2: any id not in the input set is silently dropped.
+    BR6: on any failure (not found, timeout, parse error, non-zero exit) returns
+         candidates in BM25 input order with rerank_source='claude-error' (or more
+         specific sources for not-found / timeout / parse-error cases).
+    BR8: returned ids get rerank_score = 1.0/(rank+1); unranked get 0.0.
+    """
+    if not candidates:
+        return []
+
+    # Build prompt (BR9: only chunk_id and snippet, no paths)
+    snippets = []
+    for c in candidates:
+        text = c.get("raw_text") or c.get("snippet") or ""
+        if not text and c.get("path"):
+            chunk = load_chunk(c["path"])
+            if chunk:
+                text = chunk.get("contextualized_text") or chunk.get("raw_text", "")
+        snippet = (text[:200].rstrip() + "…") if len(text) > 200 else text
+        snippets.append(f'  {c["chunk_id"]} | "{snippet}"')
+
+    prompt = (
+        "SYSTEM: You are a document relevance ranker. "
+        "Reorder these candidate chunk ids by relevance to the query. "
+        "Return ONLY a JSON array of the exact chunk_id strings in ranked order "
+        "(most relevant first). Do NOT invent new ids. Any id you return that is "
+        "not in the input list will be ignored.\n"
+        f"USER:\nquery: {query}\ncandidates:\n" + "\n".join(snippets)
+    )
+
+    input_ids = {c["chunk_id"] for c in candidates}
+    id_order = [c["chunk_id"] for c in candidates]
+
+    # Resolve claude command
+    resolved_cmd = shutil.which(claude_cmd) or claude_cmd
+    if not shutil.which(claude_cmd):
+        log(f"claude not found: {claude_cmd}")
+        for c in candidates:
+            c["rerank_score"] = float(c.get("score", 0.0))
+            c["rerank_source"] = "claude-not-found"
+        return candidates[:top_k]
+
+    try:
+        result = subprocess.run(
+            [resolved_cmd, "-p"],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        log(f"claude timed out: {claude_cmd}")
+        for c in candidates:
+            c["rerank_score"] = float(c.get("score", 0.0))
+            c["rerank_source"] = "claude-timeout"
+        return candidates[:top_k]
+    except (FileNotFoundError, OSError):
+        log(f"claude not found: {claude_cmd}")
+        for c in candidates:
+            c["rerank_score"] = float(c.get("score", 0.0))
+            c["rerank_source"] = "claude-not-found"
+        return candidates[:top_k]
+
+    if result.returncode != 0:
+        log(f"claude exited {result.returncode}: {result.stderr[:200]}")
+        for c in candidates:
+            c["rerank_score"] = float(c.get("score", 0.0))
+            c["rerank_source"] = "claude-error"
+        return candidates[:top_k]
+
+    # Parse JSON response
+    stdout = result.stdout.strip()
+    try:
+        ranked_ids = json.loads(stdout)
+        if not isinstance(ranked_ids, list):
+            raise ValueError("response is not a JSON array")
+    except (json.JSONDecodeError, ValueError) as e:
+        log(f"claude parse error: {e}; raw={stdout[:200]!r}")
+        for c in candidates:
+            c["rerank_score"] = float(c.get("score", 0.0))
+            c["rerank_source"] = "claude-parse-error"
+        return candidates[:top_k]
+
+    # Validate ids (BR2: drop out-of-set)
+    valid_ids = [cid for cid in ranked_ids if cid in input_ids]
+    if len(ranked_ids) != len(valid_ids):
+        dropped = len(ranked_ids) - len(valid_ids)
+        log(f"claude returned {dropped} out-of-set id(s); dropped")
+
+    # Build ranked output (BR8)
+    by_id = {c["chunk_id"]: c for c in candidates}
+    ranked_set = set(valid_ids)
+    result_list = []
+    for rank, cid in enumerate(valid_ids):
+        c = by_id[cid]
+        c["rerank_score"] = 1.0 / (rank + 1)
+        c["rerank_source"] = f"claude:{claude_cmd}"
+        result_list.append(c)
+
+    # Append unranked remainder in BM25 input order (FR6/BR8)
+    for cid in id_order:
+        if cid not in ranked_set:
+            c = by_id[cid]
+            c["rerank_score"] = 0.0
+            c["rerank_source"] = f"claude:{claude_cmd}"
+            result_list.append(c)
+
+    return result_list[:top_k]
+
+
+def rerank(query, candidates, top_k=5, allow_remote=False,
+           rerank_tier=None, claude_cmd="claude"):
     """Returns candidates list, possibly truncated to top_k, with rerank_score added.
     Falls back to input-order if ollama is unavailable (still adds rerank_source: 'noop').
+
+    rerank_tier: 'auto' (default) or 'claude'. Reads RERANK_TIER env var as default
+                 when rerank_tier is None (BR10). Explicit kwarg always wins.
+    claude_cmd:  path/name of the claude binary (default 'claude').
     """
+    # BR10: resolve tier from env when not explicitly passed
+    if rerank_tier is None:
+        rerank_tier = os.environ.get("RERANK_TIER", "auto")
+
+    # FR3: when tier == 'claude', bypass ollama entirely
+    if rerank_tier == "claude":
+        return rerank_claude(query, candidates, top_k=top_k, claude_cmd=claude_cmd)
+
+    # FR4: tier == 'auto' — existing cosine->noop path (unchanged)
     url = ollama_url(allow_remote)
     alive, models = ollama_alive(url)
     if not alive:
@@ -271,6 +403,7 @@ def main():
         if not args.query:
             log("--peek needs a query string")
             sys.exit(EXIT_USAGE)
+        active_tier = os.environ.get("RERANK_TIER", "auto")
         url = ollama_url(args.allow_remote_ollama)
         alive, models = ollama_alive(url)
         strategy = "noop-no-ollama"
@@ -279,6 +412,8 @@ def main():
         print(json.dumps({
             "query": args.query,
             "strategy": strategy,
+            "rerank_tier": active_tier,
+            "claude_cmd": "claude",
             "ollama_url": url,
             "ollama_alive": alive,
             "model_present": DEFAULT_MODEL in models,

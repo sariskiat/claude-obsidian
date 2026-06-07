@@ -114,6 +114,13 @@ def main():
                         help="Include per-stage diagnostics in output")
     parser.add_argument("--allow-remote-ollama", action="store_true",
                         help="Forwarded to rerank.py")
+    parser.add_argument("--rerank-tier", default=None, dest="rerank_tier",
+                        choices=["auto", "claude"],
+                        help="Reranker tier: 'auto' (cosine->noop) or 'claude' "
+                             "(claude -p reranker). Default: RERANK_TIER env var or 'auto'.")
+    parser.add_argument("--claude-cmd", default="claude", dest="claude_cmd",
+                        help="claude binary name or path (default: 'claude'). "
+                             "Used with --rerank-tier claude.")
     args = parser.parse_args()
 
     if not BM25_INDEX.is_file():
@@ -156,9 +163,13 @@ def main():
             c["rerank_score"] = c["bm25_score"]
             c["rerank_source"] = "skipped"
     else:
+        import os as _os
+        effective_tier = args.rerank_tier or _os.environ.get("RERANK_TIER", "auto")
         final = reranker.rerank(
             args.query, candidates, top_k=args.top,
             allow_remote=args.allow_remote_ollama,
+            rerank_tier=effective_tier,
+            claude_cmd=args.claude_cmd,
         )
         # Derive strategy from first candidate's rerank_source
         first_src = (final[0].get("rerank_source") if final else "unknown")

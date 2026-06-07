@@ -98,7 +98,7 @@ When I see ranked white-space bridges in my claim graph, I want Claude Code to r
 
 ## Constraints
 
-- **Must not break:** `make test-graph` (44 passed / 4 skipped), `make test-fulltext` (44), `make test-bridge`; the 9-table round-trip byte-equal.
+- **Must not break:** `make test-graph` (44 passed / 4 skipped), `make test-fulltext` (45), `make test-bridge`; the 9-table round-trip byte-equal.
 - **Performance:** dossier + retrieval well under a minute; `claude -p` latency is the dominant term (acceptable, AFK tool).
 - **Security/compliance:** egress is opt-in-by-design and only to `claude -p`; no API keys read; no other network calls.
 - **Mutable surface:** `scripts/graph-propose.py`, `tests/test_graph_propose.py`, `wiki/graph/RESEARCH_PROFILE.md` (new), `wiki/graph/proposals/` (new, generated), `commands/graph.md`, `skills/graph/SKILL.md`, `Makefile`, `wiki/graph/SCHEMA.md`, `.gitignore`.
@@ -121,7 +121,7 @@ When I see ranked white-space bridges in my claim graph, I want Claude Code to r
 | AC5 | Source safety + no clobber: `~/Desktop/research/proposals.md` never written; output under `wiki/graph/proposals/`; same-day rerun suffixes `-2`. | `pytest -k no_clobber` |
 | AC6 | Degradation: missing db → exit 1 + hint; `--claude-cmd` absent → non-zero + hint; missing profile → hint. | `pytest -k degrade` |
 | AC7 | Gold anchor available: the VTON×diffusion-sampling bridge appears in the candidate dossier by entity membership (not a hardcoded id). | `pytest -k gold_anchor` |
-| AC8 | No regression: `make test-graph` (44/4), `make test-fulltext` (44), `make test-bridge` stay green; `graph-build.py` unmodified. | `make test-graph && make test-fulltext && make test-bridge` |
+| AC8 | No regression: `make test-graph` (44/4), `make test-fulltext` (45), `make test-bridge` stay green; `graph-build.py` unmodified. | `make test-graph && make test-fulltext && make test-bridge` |
 | AC9 | **Live evidence:** one real `claude -p` run over the live graph yields a structurally-complete report (section contract present: bar / decision-matrix table / ≥3 direction blocks each with a Takedown / ranking / execution probe) with a `N/N citations verified ✓` footer and 100% grounded cites; transcript saved to the overnight report. | live run + `grep -E` on the saved report |
 | AC10 | Wiring: `commands/graph.md` and `skills/graph/SKILL.md` both reference `/graph propose` → `graph-propose.py`; `make test-propose` exists. | `grep -q 'graph-propose' commands/graph.md skills/graph/SKILL.md` |
 

@@ -323,40 +323,18 @@ def _build_prompt(
 # Grounding gate (FR8)
 # ---------------------------------------------------------------------------
 
-_CITATION_STOPLIST = frozenset([
-    # Common English multi-word compound modifiers that are never paper slugs.
-    # These appear in body prose but look like slugs to the regex.
-    "as-a-feature", "as-a-resource", "as-a-service", "as-a-tool",
-    "appearance-versus-motion", "appearance-vs-motion", "appearance-vs-temporal",
-    "proof-of-concept", "state-of-the-art", "end-to-end", "plug-and-play",
-    "one-size-fits-all", "case-by-case", "step-by-step", "side-by-side",
-    "patch-for-patch", "pixel-for-pixel", "one-to-one", "one-to-many",
-    "compression-of-conditioning", "generation-of-conditioning",
-    "bits-survived", "clean-exec", "boundary-locus",
-    # Research/statistics modifiers
-    "memorize-versus-create", "memorise-versus-create",
-    "first-order-collapse", "second-order-collapse",
-    "high-relevance-score", "low-relevance-score",
-    "order-of-convergence", "rate-of-convergence",
-    "data-processing-inequality", "information-processing-inequality",
-    "tractable-but-low-signal", "tractable-but-high-signal",
-    "why-diffusion-models-don-t-memorize", "why-diffusion-models-dont-memorize",
-    "hard-to-reproduce", "easy-to-reproduce", "hard-to-verify",
-    "not-in-graph", "already-proposed", "theory-co-author",
-    "co-author", "deep-read", "deep-reads",
-])
-
-
 def _extract_citations(report_text: str) -> set:
-    """Extract citation-like tokens from a report.
+    """Extract citation-like tokens from a report for grounding verification.
 
-    Conservative extraction to minimise false positives from body prose:
-    - ALL-CAPS hyphenated tokens (FABRICATED-PAPER-9999, HALLUCINATED-ENTITY-XYZ)
-      are hallucination markers and always flagged.
-    - Lowercase slug-like tokens are only flagged if they have at least 2 hyphens
-      (3+ word slugs like 'diffusion-sampling-with-momentum') to avoid false
-      positives from two-part compound adjectives, AND must not be in the
-      stop-list of common English multi-word modifiers.
+    Two-tier strategy:
+    1. ALL-CAPS hyphenated tokens (FABRICATED-PAPER-9999, HALLUCINATED-ENTITY-XYZ)
+       — these are clear hallucination markers (the prompt explicitly says not to
+       invent citations, so any ALL-CAPS compound is a red flag).
+    2. Lowercase slug-like tokens that appear in backtick code spans or after
+       known citation markers like 'paper:' or '[' — narrowed to reduce false
+       positives from prose compound modifiers.
+
+    The allow-list + suffix-match in _verify_citations handles the rest.
     """
     citations = set()
 
@@ -364,12 +342,11 @@ def _extract_citations(report_text: str) -> set:
     for m in re.finditer(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+){1,})\b", report_text):
         citations.add(m.group(1))
 
-    # Lowercase multi-word slug-like tokens (require 2+ hyphens = 3+ word slugs)
-    # This filters out two-part compound adjectives that appear in body prose.
-    for m in re.finditer(r"\b([a-z][a-z0-9]+(?:-[a-z0-9]+){2,})\b", report_text):
+    # Backtick-quoted tokens (the report may cite slugs in `code spans`)
+    # These are likely intentional citations, not prose compound modifiers.
+    for m in re.finditer(r"`([a-z][a-z0-9]+(?:-[a-z0-9]+){2,})`", report_text):
         tok = m.group(1)
-        # Skip short tokens and well-known English modifiers
-        if len(tok) >= 10 and tok not in _CITATION_STOPLIST:
+        if len(tok) >= 10:
             citations.add(tok)
 
     return citations

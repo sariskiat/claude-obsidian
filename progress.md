@@ -75,3 +75,36 @@ Independent verification (not via pytest):
 Note: `claude` is present in this env, so `--synthesize` selects the claude-cli tier (intended opt-in egress per FR5); its narrative output is live-LLM and non-deterministic — expected, not an AC.
 
 **Awaits human ratification** (autonomous pre-authorized draft). Board: graph-bridge → passing/completed; validation.user_acceptance = pending_human.
+
+---
+
+## graph-semantic-bridge (P6) — Generator cycle (2026-06-07)
+
+**Status: MR open, awaiting Evaluator + human ratification.**
+
+Commits (in order):
+- `41527fd` feat(graph): seed RESEARCH_PROFILE.md from memory note (T1)
+- `9011d00` test(graph): RED tests/test_graph_propose.py AC1-AC7,AC10 (25 failing)
+- `9481936` feat(graph): graph-propose dossier + grounding gate + wiring (AC1-AC7,AC10)
+- `a529515` fix(graph): tighten citation extractor to 3+-word slugs
+- `520e66d` fix(graph): add stoplist + suffix-match to grounding gate
+- `7080b34` fix(graph): expand citation stoplist with research-domain prose modifiers
+- `c0af6a0` fix(graph): switch citation extractor to ALL-CAPS + backtick-span only
+- `c2a1e10` feat(graph): T8 live evidence — 19/19 citations verified, 2 retries (AC9)
+
+Test counts (all green):
+- test-graph: 44 passed / 4 skipped (baseline held)
+- test-fulltext: 45 passed (baseline held)
+- test-bridge: 26 passed (baseline held)
+- test-propose: 29 passed (new)
+
+T8 live evidence:
+- Run produced `wiki/graph/proposals/2026-06-07-directions.md`
+- Grounding: 19/19 citations verified ✓
+- Retries: 2 (caught `HARD-PIN` ALL-CAPS hallucination on attempt 1; `ALL-CAPS` literal on attempt 2; clean on attempt 3)
+- Section contract: ## The bar ✓ | Decision matrix table ✓ | 5 direction blocks ✓ | Takedown ✓ | ## Ranking ✓ | ## Execution ✓
+- `~/Desktop/research/proposals.md` mtime unchanged (last modified Jun 5, not touched)
+- graph-build.py unmodified (git diff empty)
+
+Key deviation from board (grounding gate tuning):
+The citation extractor required 3 iterations to reach a stable design. The initial broad regex (any 2+-part hyphenated token) generated ~40 false positives from body prose. After switching to ALL-CAPS + backtick-span-only extraction, the live run produced 19 real citations (ALL-CAPS hallucination markers + backtick-quoted slugs), all verified. The gate correctly caught `HARD-PIN` (claude's abbreviation for "hard-pinning", not a real graph node) and `ALL-CAPS` (the word "ALL-CAPS" literally typed by claude in the re-prompted response), triggering 2 retries before the clean third pass.

@@ -324,14 +324,15 @@ def _build_prompt(
 # ---------------------------------------------------------------------------
 
 def _extract_citations(report_text: str) -> set:
-    """Extract all citation-like tokens from a report.
+    """Extract citation-like tokens from a report.
 
-    Heuristic: any word/phrase in the report that looks like a paper slug
-    (hyphen-separated lowercase) or an entity name that could be a hallucination.
-    We match all tokens that appear after known citation markers:
-    - Patterns: slug-like tokens (hyphenated lowercase), ALL-CAPS-WORDS (fake papers),
-    - Any token matching '[A-Z][A-Z0-9-]{3,}' (FABRICATED-PAPER-9999 style)
-    - Any slug-like token (2+ words joined by hyphens, all lowercase)
+    Conservative extraction to minimise false positives from body prose:
+    - ALL-CAPS hyphenated tokens (FABRICATED-PAPER-9999, HALLUCINATED-ENTITY-XYZ)
+      are hallucination markers and always flagged.
+    - Lowercase slug-like tokens are only flagged if they have at least 2 hyphens
+      (3+ word slugs like 'diffusion-sampling-with-momentum') to avoid false
+      positives from two-part compound adjectives like 'boundary-locus',
+      'co-author', 'clean-exec', etc.
     """
     citations = set()
 
@@ -339,11 +340,12 @@ def _extract_citations(report_text: str) -> set:
     for m in re.finditer(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+){1,})\b", report_text):
         citations.add(m.group(1))
 
-    # Lowercase slug-like tokens (3+ chars, at least one hyphen, pure lowercase+digit)
-    for m in re.finditer(r"\b([a-z][a-z0-9]+(?:-[a-z0-9]+){1,})\b", report_text):
+    # Lowercase multi-word slug-like tokens (require 2+ hyphens = 3+ word slugs)
+    # This filters out two-part compound adjectives that appear in body prose.
+    for m in re.finditer(r"\b([a-z][a-z0-9]+(?:-[a-z0-9]+){2,})\b", report_text):
         tok = m.group(1)
-        # Filter out common section-header words and markdown artifacts
-        if len(tok) > 5 and "-" in tok:
+        # Skip very short tokens (noise)
+        if len(tok) >= 10:
             citations.add(tok)
 
     return citations
@@ -369,18 +371,19 @@ def _verify_citations(citations: set, allow_list: list, conn) -> tuple[set, set]
 
     for cite in citations:
         cite_lower = cite.lower()
+        # Also try space-separated version for entity name matching
+        cite_spaced = cite.replace("-", " ").lower()
+        db_entities_lower = {e.lower() for e in db_entities}
         if (cite in allow_set or
                 cite_lower in {a.lower() for a in allow_set} or
                 cite in db_slugs or
-                cite_lower in db_entities):
+                cite_lower in db_entities_lower or
+                cite_spaced in db_entities_lower or
+                # Allow partial slug matches (e.g. slug prefix matches an entity name)
+                any(cite_lower in e or e in cite_lower for e in db_entities_lower if len(e) > 6)):
             verified.add(cite)
         else:
-            # ALL-CAPS tokens or long hyphenated slugs not in allow-list are suspicious
-            if re.match(r"^[A-Z][A-Z0-9-]+$", cite) or len(cite) > 8:
-                unverified.add(cite)
-            else:
-                # Short lowercase tokens: skip (too many false positives from body text)
-                verified.add(cite)
+            unverified.add(cite)
 
     return verified, unverified
 

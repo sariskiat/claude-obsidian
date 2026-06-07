@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "current_feature": "graph-semantic-bridge",
+  "current_feature": "wiki-rerank-claude",
   "wip_limit": 1,
   "features": {
     "graph-vault-migration": {
@@ -1644,6 +1644,287 @@
       },
       "eval_attempts": 2,
       "retries_remaining": 1
+    },
+    "wiki-rerank-claude": {
+      "title": "Claude -p Reranker Tier",
+      "status": "in_progress",
+      "phase": "plan",
+      "problem_statement": "ollama is not installed on this machine, so rerank.py's cosine tier is inert and falls through to BM25-only order on every query — no semantic reranking happens at all. BM25 alone is keyword-only and misses semantic matches. The vault has `claude` on PATH; a `claude -p` tier placed between cosine and BM25-only gives real semantic reranking with zero new infrastructure.",
+      "jtbd": "When I run a retrieval query against my wiki or graph, I want the top-K results ordered by genuine semantic relevance to my query — not just keyword overlap — without having to install ollama, so I can read the most relevant passages first using the claude CLI I already have.",
+      "problem_classification": "unique",
+      "user_context": "Single-tenant research vault. Owner: saris. claude CLI on PATH at /Users/saris.kia.adm/.local/bin/claude; ollama NOT installed (confirmed by recon: `which ollama` -> not found). Python 3.12 via uv run. Zero-egress default posture is a hard repo rule.",
+      "spec_file": "specs/wiki-rerank-claude.md",
+      "spec_status": "approved",
+      "approval": {
+        "approved_by": "saris",
+        "date": "2026-06-07"
+      },
+      "depends_on": [],
+      "blocks": [],
+      "scope_map": {
+        "modify": [
+          "scripts/rerank.py",
+          "scripts/retrieve.py",
+          "scripts/graph-retrieve.py",
+          "tests/test_retrieve.py"
+        ],
+        "read_only": [
+          "scripts/bm25-index.py",
+          "scripts/graph-propose.py",
+          "scripts/rerank.py:cosine-and-noop-paths",
+          "pyproject.toml",
+          "Makefile"
+        ],
+        "metric": {
+          "name": "acceptance-criteria-pass-count",
+          "baseline": "0/10 claude-tier ACs pass; test-retrieve=23 OK green; test-graph=44 passed/4 skipped green",
+          "target": "10/10 claude-tier ACs pass AND test-retrieve green AND test-graph green AND no existing test regresses",
+          "direction": "increase"
+        }
+      },
+      "acceptance_criteria": [
+        {
+          "id": "AC1",
+          "criterion": "Claude tier reorders candidates by returned chunk_ids only; fake claude returns a permuted order of real ids and output order matches the permutation (BR1).",
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -q 'OK   claude tier reorders by given ids'",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC2",
+          "criterion": "Out-of-set ids returned by claude are silently dropped; unranked remainder fills from BM25 order; total count == min(top_k, input candidates) (BR2, FR6).",
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -q 'OK   claude tier drops invented ids'",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC3",
+          "criterion": "Default path (rerank_tier='auto') never spawns a claude subprocess; subprocess.run is asserted-never-called (BR3, BR4, FR4).",
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -q 'OK   default path no claude call'",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC4",
+          "criterion": "retrieve.py CLI with --rerank-tier claude --claude-cmd <fake> triggers the claude path; output strategy contains 'claude' (FR7).",
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -q 'OK   retrieve CLI claude tier strategy'",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC5",
+          "criterion": "Fallback ladder correct: auto+no-ollama -> 'noop-no-ollama'; claude+fake-ok -> 'claude:<cmd>'; claude+fail -> 'claude-error' (BR6, FR3).",
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -q 'OK   fallback ladder'",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC6",
+          "criterion": "Mocked-engine tests stay fully offline (<10s, no network); opted-in tests invoke the fake claude, default-path tests never do (BR4, BR7).",
+          "verification": "t0=$(python3 -c 'import time;print(time.time())'); python3 tests/test_retrieve.py >/dev/null 2>&1 && python3 -c \"import time,sys; sys.exit(0 if time.time()-$t0 < 10 else 1)\"",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC7",
+          "criterion": "make test-retrieve passes green (exit 0) — no regression to existing 23 checks.",
+          "verification": "make test-retrieve >/dev/null 2>&1",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC8",
+          "criterion": "make test-graph passes green (exit 0) — no regression to the 44-passed/4-skipped graph suite.",
+          "verification": "make test-graph >/dev/null 2>&1",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC9",
+          "criterion": "rerank.py --peek output gains a 'rerank_tier' field showing the active tier (FR10).",
+          "verification": "uv run python scripts/rerank.py --peek 'test' 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'rerank_tier' in d, 'missing rerank_tier'; assert d['rerank_tier'] in ('auto','claude')\"",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "id": "AC10",
+          "criterion": "--no-rerank wins over --rerank-tier claude: fake claude never called, strategy='bm25-only' (BR-precedence, FR11).",
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -q 'OK   no-rerank beats claude tier'",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "T1",
+          "title": "Add failing claude-tier tests to tests/test_retrieve.py (TDD red): reorder-by-ids, drop-invented-ids, default-no-claude, fallback-ladder, no-rerank-precedence, plus a fake-claude shell-exe helper mirroring test_graph_propose.py's --claude-cmd pattern; wire all new test fns into main().",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "tests/test_retrieve.py"
+          ],
+          "depends_on": [],
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -qE 'FAIL|Error' # red: new tests fail before impl",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "tests/test_retrieve.py"
+            ],
+            "read_only": [
+              "tests/test_graph_propose.py",
+              "scripts/rerank.py"
+            ],
+            "metric": "new test functions present and failing (red)"
+          }
+        },
+        {
+          "id": "T2",
+          "title": "Implement rerank_claude(query, candidates, top_k, claude_cmd) in rerank.py: build grounded prompt (query + per-candidate chunk_id + snippet<=200 chars, no paths — BR9), call subprocess.run([claude_cmd,'-p'], input=prompt, timeout=60) mirroring graph-propose _run_claude, parse JSON id array, validate ids against input set (drop out-of-set BR2), assign rerank_score=1/(rank+1) and source 'claude:<cmd>', append unranked in BM25 order to fill top_k (FR6/BR8), graceful fallback sources (claude-not-found/timeout/parse-error/error -> BM25 order, never raise BR6).",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "scripts/rerank.py"
+          ],
+          "depends_on": [
+            "T1"
+          ],
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -qE 'OK   claude tier reorders by given ids|OK   claude tier drops invented ids'",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "scripts/rerank.py"
+            ],
+            "read_only": [
+              "scripts/graph-propose.py"
+            ],
+            "metric": "AC1+AC2 pass"
+          }
+        },
+        {
+          "id": "T3",
+          "title": "Extend rerank() signature with rerank_tier (default os.environ.get('RERANK_TIER','auto'), explicit kwarg wins BR10) and claude_cmd (default 'claude'): when tier=='claude' bypass ollama entirely and call rerank_claude on BM25 shortlist, fall through to BM25-only on failure (FR2/FR3); tier=='auto' is byte-identical to today's cosine->noop path, claude NEVER called (FR4/BR3). Preserve cosine + all noop paths exactly.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "scripts/rerank.py"
+          ],
+          "depends_on": [
+            "T2"
+          ],
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -qE 'OK   default path no claude call' && python3 tests/test_retrieve.py 2>&1 | grep -qE 'OK   fallback ladder'",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "scripts/rerank.py"
+            ],
+            "read_only": [
+              "scripts/rerank.py:cosine-and-noop-paths"
+            ],
+            "metric": "AC3+AC5 pass"
+          }
+        },
+        {
+          "id": "T4",
+          "title": "Add 'rerank_tier' (and resolved claude_cmd) to rerank.py --peek output (FR10). --peek shows os.environ.get('RERANK_TIER','auto') as active tier.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "scripts/rerank.py"
+          ],
+          "depends_on": [
+            "T3"
+          ],
+          "verification": "uv run python scripts/rerank.py --peek 'test' 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'rerank_tier' in d\"",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "scripts/rerank.py"
+            ],
+            "read_only": [],
+            "metric": "AC9 pass"
+          }
+        },
+        {
+          "id": "T5",
+          "title": "Add --rerank-tier (default 'auto', choices auto/claude) and --claude-cmd (default 'claude') flags to retrieve.py; resolve RERANK_TIER env as default with explicit flag winning (FR9); forward both into reranker.rerank(); --no-rerank short-circuit still wins over everything including claude (FR11). Derive strategy string so it surfaces the claude source (e.g. bm25+rerank:claude:<cmd>).",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "scripts/retrieve.py"
+          ],
+          "depends_on": [
+            "T3"
+          ],
+          "verification": "python3 tests/test_retrieve.py 2>&1 | grep -qE 'OK   retrieve CLI claude tier strategy' && python3 tests/test_retrieve.py 2>&1 | grep -qE 'OK   no-rerank beats claude tier'",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "scripts/retrieve.py"
+            ],
+            "read_only": [
+              "scripts/rerank.py"
+            ],
+            "metric": "AC4+AC10 pass"
+          }
+        },
+        {
+          "id": "T6",
+          "title": "Add identical --rerank-tier + --claude-cmd flags to graph-retrieve.py with the same RERANK_TIER-env-default + explicit-flag-wins + forwarding-to-rerank.rerank() behavior; --no-rerank still wins (FR8/FR9/FR11). Keep direct-load (--paper/--claim) path untouched.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [
+            "scripts/graph-retrieve.py"
+          ],
+          "depends_on": [
+            "T3"
+          ],
+          "verification": "python3 scripts/graph-retrieve.py --help 2>&1 | grep -q -- '--rerank-tier' && python3 scripts/graph-retrieve.py --help 2>&1 | grep -q -- '--claude-cmd'",
+          "evidence": [],
+          "scope_map": {
+            "modify": [
+              "scripts/graph-retrieve.py"
+            ],
+            "read_only": [
+              "scripts/rerank.py"
+            ],
+            "metric": "graph-retrieve --help shows both flags"
+          }
+        },
+        {
+          "id": "T7",
+          "title": "Full-suite regression gate: run make test-retrieve and make test-graph; both must exit 0 green with no regression to the prior 23 retrieve checks / 44-passed graph suite. Confirm AC6 offline-speed (<10s) and AC3/BR4 zero-egress-on-default still hold.",
+          "agent": "tildi-generator",
+          "status": "not_started",
+          "files": [],
+          "depends_on": [
+            "T1",
+            "T2",
+            "T3",
+            "T4",
+            "T5",
+            "T6"
+          ],
+          "verification": "make test-retrieve >/dev/null 2>&1 && make test-graph >/dev/null 2>&1",
+          "evidence": [],
+          "scope_map": {
+            "modify": [],
+            "read_only": [
+              "Makefile"
+            ],
+            "metric": "AC7+AC8 pass; full green"
+          }
+        }
+      ],
+      "validation": {
+        "user_acceptance": "pending",
+        "business_metric": "pending"
+      },
+      "learning": {
+        "technical": [],
+        "product": [],
+        "process": [],
+        "harness_updates": []
+      }
     }
   }
 }

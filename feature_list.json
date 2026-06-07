@@ -1958,7 +1958,7 @@
       "id": "graph-resolve-apply",
       "title": "Apply Safe Entity-Resolution Merges (connect the islands)",
       "status": "in_progress",
-      "phase": "plan",
+      "phase": "build",
       "problem_classification": "unique",
       "problem_statement": "The Obsidian graph shows ~93 paper-islands. Only 136 of 755 canonical entities span >1 paper; duplicates were detected by P3's resolve.py but never merged. Until something writes the canonical_id pointers, every re-export reproduces the same fragmented graph and the five gap species under-count.",
       "jtbd": "When the resolver has surfaced duplicate entities, I want to commit the ones I trust (fold each duplicate into its canonical twin so two papers that used different names for the same thing share one graph node), so I can turn 93 disconnected islands into a connected research map for cross-paper agreement/debate/white-space analysis.",
@@ -2040,8 +2040,10 @@
           "criterion": "STAGE A. Winner selection matches spec 4 on every applied pair (claim-degree on pre-merge root-resolved ids; tie -> min id). The dry-run printed plan equals the App-A loser->winner mapping.",
           "verification": "uv run python scripts/graph-resolve-apply.py --merge-file specs/merges/graph-resolve-apply.tsv --json | uv run python -c \"import json,sys; p={int(x['loser']):int(x['winner']) for x in json.load(sys.stdin)['plan']}; assert p=={1366:1149,1354:730,1386:730,1387:921,1367:879,1389:1359,934:336,1413:1368,1053:914}, p\"",
           "stage": "A",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "Verified by real exec: live dry-run --json plan equals App-A mapping exactly (board verbatim assert passed, exit 0). Degrees match spec 4 worked-example table (e.g. 1053 deg1->914 deg15; 1354 deg2/1386 deg1->730 deg6)."
+          ]
         },
         {
           "id": "AC3",
@@ -2104,8 +2106,10 @@
           "criterion": "STAGE A. Dry-run is the default and writes nothing; --commit is required to persist. Running the apply without --commit leaves the 9 loser files byte-unchanged (git clean on them).",
           "verification": "uv run python scripts/graph-resolve-apply.py --merge-file specs/merges/graph-resolve-apply.tsv >/dev/null 2>&1; test -z \"$(git status --porcelain wiki/graph/entities/anydoor__e1366.md wiki/graph/entities/classifier-free-guidance__e1354.md wiki/graph/entities/clip__e1413.md)\"",
           "stage": "A",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "Verified by real exec: ran apply WITHOUT --commit; git status --porcelain wiki/graph/entities/ EMPTY; all 9 losers still is_canonical:true with no numeric canonical_id. Board verbatim AC10 cmd exit 0."
+          ]
         },
         {
           "id": "AC11",
@@ -2120,8 +2124,10 @@
           "criterion": "STAGE A. Edge cases: missing db -> exit 1 with rebuild hint; empty/missing merge-file -> exit 1; idempotent re-run (--commit twice) -> second run all no-ops exit 0; frozenset dedup of DINOv2/MSE Tier-1+Tier-2 dupes; skip (not re-point) a loser already merged elsewhere.",
           "verification": "uv run python -m pytest tests/test_graph_resolve_apply.py -v",
           "stage": "A",
-          "status": "not_started",
-          "evidence": []
+          "status": "done",
+          "evidence": [
+            "Verified by real exec: pytest tests/test_graph_resolve_apply.py -v -> 18 passed (0.71s). Live edge-case processes: missing-db exit 1 (rebuild hint), missing merge-file exit 1, empty/0-byte merge-file exit 1; idempotent --commit run#2 byte-identical (sandbox); frozenset dedup + already-merged-elsewhere skip covered."
+          ]
         }
       ],
       "tasks": [
@@ -2129,13 +2135,15 @@
           "id": "T1",
           "title": "STAGE A. Create specs/merges/graph-resolve-apply.tsv from App-A: 9 rows loser<TAB>winner<TAB>reason (1366->1149, 1354->730, 1386->730, 1387->921, 1367->879, 1389->1359, 934->336, 1413->1368, 1053->914). Plus header comment line. This is the reviewable, human-ratifiable merge artifact (FR10, the gate).",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "specs/merges/graph-resolve-apply.tsv"
           ],
           "depends_on": [],
           "verification": "test -f specs/merges/graph-resolve-apply.tsv && test \"$(grep -vcE '^#' specs/merges/graph-resolve-apply.tsv)\" -eq 9",
-          "evidence": [],
+          "evidence": [
+            "specs/merges/graph-resolve-apply.tsv present; 9 data rows (grep -vcE '^#' = 9); winner=max-degree tie->min-id documented in header"
+          ],
           "stage": "A",
           "scope_map": {
             "modify": [
@@ -2151,7 +2159,7 @@
           "id": "T2",
           "title": "STAGE A (TDD-first). Write tests/test_graph_resolve_apply.py against SANDBOX dbs/fixtures (NOT the live vault): winner-selection by claim-degree + tie->min-id (spec 4); frozenset dedup of duplicate pairs (DINOv2 1367/879, MSE 1389/1359); 3-way CFG group flattens to 730 (no 1386->1354); dry-run-default-writes-nothing; --commit writes loser frontmatter (is_canonical:false, canonical_id, canonical wikilink, merge_confidence); missing-db exit 1; missing/empty merge-file exit 1; loser-not-in-db skip+continue; already-merged-elsewhere skip (no re-point); idempotent re-run no-op exit 0; winner==loser self-pair skip. Tests RED first.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "tests/test_graph_resolve_apply.py"
           ],
@@ -2159,7 +2167,9 @@
             "T1"
           ],
           "verification": "uv run python -m pytest tests/test_graph_resolve_apply.py -q 2>&1 | grep -qE 'passed' && uv run python -m pytest tests/test_graph_resolve_apply.py -q >/dev/null 2>&1",
-          "evidence": [],
+          "evidence": [
+            "tests/test_graph_resolve_apply.py: 18 sandbox tests (tmp_path dbs, never the live vault) — winner-select incl. field-order-not-trusted, frozenset dedup, CFG 3-way flat, dry-run-writes-nothing, commit writes loser frontmatter+merge_confidence, missing-db/empty-merge-file exit 1, loser-not-in-db skip, already-merged-elsewhere skip, idempotent rerun, winner==loser skip, JSON schema. 18 passed in 0.71s"
+          ],
           "stage": "A",
           "scope_map": {
             "modify": [
@@ -2176,7 +2186,7 @@
           "id": "T3",
           "title": "STAGE A. Implement scripts/graph-resolve-apply.py to green T2. Reads the derived db (degree via graph_db.root, compress=False) + the --merge-file; computes winner per spec 4; dedups pairs by frozenset; flattens multi-id groups to one winner; edits ONLY loser .md frontmatter (is_canonical:false, canonical_id:<winner>, canonical wikilink, merge_confidence). DRY-RUN is the DEFAULT (prints plan loser->winner + degrees + reason, exits 0, writes nothing); writes only with --commit. --json emits {plan:[{loser,winner,deg_loser,deg_winner,reason}]}. Missing db/merge-file -> exit 1. Idempotent. Does NOT rebuild (FR7). Imports degree/root from graph_db; does NOT touch resolve.py.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "scripts/graph-resolve-apply.py"
           ],
@@ -2184,7 +2194,9 @@
             "T2"
           ],
           "verification": "uv run python -m pytest tests/test_graph_resolve_apply.py -q",
-          "evidence": [],
+          "evidence": [
+            "scripts/graph-resolve-apply.py: dry-run default, --commit gated; degree via graph_db.root path (compress=False semantics) + frozenset dedup + union-find group flatten; edits loser frontmatter only. 18/18 tests green; live --json dry-run plan == App-A; independent sandbox --commit smoke wrote losers (is_canonical:false/canonical_id/wikilink/merge_confidence), left winner byte-untouched, bodies preserved, run#2 idempotent byte-identical"
+          ],
           "stage": "A",
           "scope_map": {
             "modify": [
@@ -2202,7 +2214,7 @@
           "id": "T4",
           "title": "STAGE A. Dry-run the apply on the LIVE vault and confirm it prints the computed plan (9 loser->winner with degrees) but writes NOTHING (AC2, AC10). Confirms the plan equals App-A on real data before any gate. Add tests/roundtrip_live.sh helper (export live db -> vault, rebuild to temp, row-for-row compare 9 tables) for AC5 use in Stage B; it must not depend on the absent legacy ~/.graphbuilding/graph.db.",
           "agent": "tildi-generator",
-          "status": "not_started",
+          "status": "completed",
           "files": [
             "tests/roundtrip_live.sh"
           ],
@@ -2210,7 +2222,9 @@
             "T3"
           ],
           "verification": "uv run python scripts/graph-resolve-apply.py --merge-file specs/merges/graph-resolve-apply.tsv --json | uv run python -c \"import json,sys; p={int(x['loser']):int(x['winner']) for x in json.load(sys.stdin)['plan']}; assert p=={1366:1149,1354:730,1386:730,1387:921,1367:879,1389:1359,934:336,1413:1368,1053:914}\" && test -z \"$(git status --porcelain wiki/graph/entities/clip__e1413.md)\"",
-          "evidence": [],
+          "evidence": [
+            "live dry-run --json plan == App-A {1366:1149,1354:730,1386:730,1387:921,1367:879,1389:1359,934:336,1413:1368,1053:914} with degrees matching spec 4 table; git status --porcelain wiki/graph/entities/ EMPTY after dry-run (9 losers still is_canonical:true). tests/roundtrip_live.sh PASS: 9 tables byte-equal on pre-merge vault (papers 98/sections 789/paper_authors 97/entities 1444/predicates 46/claims 1052/entity_edges 543/citation_links 0/aliases 834); live db md5 unchanged"
+          ],
           "stage": "A",
           "scope_map": {
             "modify": [
@@ -2341,13 +2355,17 @@
         }
       ],
       "validation": {
-        "user_acceptance": "pending",
-        "business_metric": "pending"
+        "user_acceptance": "pending (Stage B gated on human App-A ratification)",
+        "business_metric": "pending (post-merge metric ACs AC6/AC7 are Stage B)"
       },
       "learning": {
-        "technical": [],
+        "technical": [
+          "Stage A verified independently by real execution (Evaluator, did NOT write the code): dry-run plan == App-A on live db; 18 sandbox tests green; roundtrip_live.sh 9-tables byte-equal pre-merge; make test-graph 44p/4s no-regression. Live db md5 e36273a4 unchanged across all checks."
+        ],
         "product": [],
-        "process": [],
+        "process": [
+          "Stage A/B split honoured: Evaluator ran ONLY non--commit checks; Stage B (live --commit, export/build mutate, gaps/roundtrip re-baseline, post-merge metric ACs AC1/AC3-9/AC11) left gated behind human App-A ratification. Phase set to build (NOT passing); T5-T8 human_gate intact."
+        ],
         "harness_updates": []
       }
     }

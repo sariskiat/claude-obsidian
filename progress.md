@@ -139,3 +139,28 @@ Minor: audit footer `engine:` uses `<claude-cmd> --version` first line — robus
 BR5 clutter: 3 same-day clean reports tracked (`directions.md` 19/19, `directions-2.md` byte-dup, `directions-3.md` 20/20). Keep only `directions-3.md`; `git rm` the other two.
 
 Retry brief (attempt 3, final): make `_verify_citations` EXACT (exact slug / case-insensitive exact entity + the legit dangling-twin suffix rule only) — drop the bidirectional substring match; treat any un-backticked author-year or Title-Case+suffix token as unverified-by-default (flag, don't resolve); add a test asserting a MIXED report with a db-colliding prose fake is REJECTED (the BR1 contract, not one string); document the residual (un-backticked single-surname, no other signal) as a known limitation in the footer. Then `git rm` the two surplus clean reports.
+
+## 2026-06-07 — Generator heal-3: graph-semantic-bridge (final attempt)
+
+**Commit:** `f5aac1b fix(propose): exact-match verification + comprehensive noun coverage (BR1 heal-3)`
+
+Root causes addressed:
+1. **Bidirectional substring fallback removed.** `_verify_citations` now: exact equality (case-insensitive) OR dangling-twin suffix rule (`real_slug.endswith(cite_lower)`) only. The old `any(cite_lower in e or e in cite_lower for e in db_entities_lower if len(e) > 8)` is gone.
+2. **T3b noun set expanded from 15 to 40+ words.** Adds `objective`, `technique`, `algorithm`, `mechanism`, `pipeline`, `formulation`, `scheme`, `theory`, `analysis`, `theorem`, `lemma`, `loss`, `transfer`, `distillation`, `regularizer`, `baseline`, `benchmark`, `operator`, `estimator`, `detector`, `classifier`, `generator`, `discriminator`, `head`, `backbone`, `layer`, `block`, `unit`, `component`.
+3. **Section-word trimmer fixed.** When `_TITLE_CASE_PHRASE_T3B` captures a phrase starting with a generic determiner ("The"), the code now trims the leading word and re-emits the rest — so "The Garment Fidelity objective" → "garment fidelity" is extracted correctly.
+
+New tests (8): `TestExactVerification` (4) — collision `spatial memorization` vs `Memorization` rejected; exact slug passes; dangling-twin preserved; `Garment Fidelity objective` extracted. `TestAttackFRegression` (4) — attack-F integration: non-zero exit, no clean save, .rejected.md written; unit: all three fakes extracted.
+
+Verification results:
+- test-propose: **46 passed** (38 + 8 new)
+- test-graph: **44/4** (unchanged)
+- test-fulltext: **45** (unchanged)
+- test-bridge: **26** (unchanged)
+
+T8 live under strict gate: `7/7 citations verified ✓ | retries: 0 | engine: 2.1.168 (Claude Code)`. Section contract: ## The bar ✓ | Decision matrix table ✓ | 5 direction blocks ✓ (all with Takedown) | ## Ranking ✓ | ## Execution ✓ (with GATE conditions). Prompt NOT tightened further — the model's backtick compliance was sufficient for clean pass under the strict gate on first attempt.
+
+Dir hygiene: `git rm` 3 stale tracked reports (`directions.md`, `-2.md`, `-3.md`); deleted 5 `.rejected*.md` from disk; single canonical report `2026-06-07-directions-4.md` tracked.
+
+Documented residual: a hallucination written as a SINGLE Title-Case word or a Title-Case phrase with no method-noun AND no author-year AND no backticks may still escape. Backtick contract is the primary guard. Documented in script docstring.
+
+**Task graph-semantic-bridge → awaiting Evaluator (evidence: 46 tests green, attack-F rejected, 7/7 live, dir clean)**
